@@ -56,6 +56,29 @@ build/
   tests/              pytest suite mirroring the layout above
 ```
 
+### The `@required` decorator
+
+Defined in `architecture/base_class.py`, and used on methods like `InitialData.build()`
+(`architecture/data/pre_processor.py`) and `Trainer.train()`
+(`architecture/training/training_classes.py`) — methods the `build` layer *must* give a
+real implementation for before `architecture` can trust the resulting object.
+
+These aren't plain abstract methods because the classes that declare them are no longer
+abstract by the time they reach this point — they're concrete, instantiable classes
+(singletons, or classes the `build` layer dynamically subclasses/generates code for at
+runtime), so Python has to allow instantiating them directly. That also means
+`@abstractmethod` stops being useful as a safety net: its only check is "did a subclass
+override this method at all," and a do-nothing override like `def build(self): pass`
+already satisfies that, letting a broken/unfinished implementation through silently.
+
+`@required` adds the check `@abstractmethod` can't: it wraps the method so that calling
+it raises `NotImplementedError` if the implementation either raises `NotImplementedError`
+itself or simply returns `None`. So a no-op or unfinished override is no longer good
+enough — it fails loudly the moment it's actually called, instead of looking valid just
+because the method name was overridden. Reach for `@required` instead of
+`@abstractmethod` whenever the class itself must remain directly instantiable but a
+specific method still can't be allowed to be a silent no-op.
+
 ## How a pipeline run actually works
 
 Every multi-step construction flow follows the same shape:

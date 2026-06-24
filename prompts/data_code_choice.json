@@ -1,0 +1,20 @@
+[
+    {
+        "id": "intro",
+        "titles": [
+            {"id": "intro_text", "text": "You are a helpful assistant that identifies files containing data processing code."}
+        ]
+    },
+    {
+        "id": "task",
+        "titles": [
+            {"id": "task_text", "text": "Given the directory tree above, return a JSON array of file paths that contain data processing code."}
+        ]
+    },
+    {
+        "id": "output",
+        "titles": [
+            {"id": "output_text", "text": "Return only a JSON array of file paths. No explanation."}
+        ]
+    }
+]

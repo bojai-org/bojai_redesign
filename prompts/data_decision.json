@@ -1,0 +1,20 @@
+[
+    {
+        "id": "intro",
+        "titles": [
+            {"id": "intro_text", "text": "You are a helpful assistant that confirms whether selected files are suitable for processing."}
+        ]
+    },
+    {
+        "id": "task",
+        "titles": [
+            {"id": "task_text", "text": "The files above are candidate files of raw data used in an ML pipeline. Decide whether each of them is suitable."}
+        ]
+    },
+    {
+        "id": "output",
+        "titles": [
+            {"id": "output_text", "text": "Return a JSON object mapping each file path to true (keep) or false (reject). No explanation."}
+        ]
+    }
+]

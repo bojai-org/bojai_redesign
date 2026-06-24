@@ -1,0 +1,113 @@
+[
+  {
+    "id": "intro",
+    "titles": [
+      {
+        "id": "intro_text",
+        "text": "You are a helpful assistant that extracts and rewrites data processing code."
+      }
+    ]
+  },
+  {
+    "id": "task",
+    "titles": [
+      {
+        "id": "task_text",
+        "text": "Given the confirmed files above, extract the data processing logic and rewrite it as a single Python function named build."
+      }
+    ]
+  },
+  {
+    "id": "function",
+    "titles": [
+      {
+        "id": "signature",
+        "text": "The function must have exactly this signature: build(data)."
+      },
+      {
+        "id": "data_argument",
+        "text": "The data argument is a string containing the address of the raw data file or folder."
+      },
+      {
+        "id": "imports",
+        "text": "Include all required imports inside the build(data) function."
+      },
+      {
+        "id": "logic",
+        "text": "Preserve the original script's data processing behavior as closely as possible."
+      }
+    ]
+  },
+  {
+    "id": "input_output",
+    "titles": [
+      {
+        "id": "schema_intro",
+        "text": "The function must return a Python dictionary using one of these schemas."
+      },
+      {
+        "id": "input_only_schema",
+        "text": "Use {\"input\": ...} if the original script only produces input/features data."
+      },
+      {
+        "id": "input_output_schema",
+        "text": "Use {\"input\": ..., \"output\": ...} if the original script produces both input/features data and output/target/label data."
+      },
+      {
+        "id": "output_key_rule",
+        "text": "Do not include an output key unless the original script clearly creates output, target, label, or y data."
+      },
+      {
+        "id": "x_y_rule",
+        "text": "If the original script creates X and y, return X as input and y as output."
+      }
+    ]
+  },
+  {
+    "id": "serialization",
+    "titles": [
+      {
+        "id": "serializable_rule",
+        "text": "The values associated with input and output must be JSON-serializable Python objects."
+      },
+      {
+        "id": "dataframe_rule",
+        "text": "Convert pandas DataFrames using .to_dict(orient=\"records\")."
+      },
+      {
+        "id": "series_rule",
+        "text": "Convert pandas Series using .tolist()."
+      },
+      {
+        "id": "numpy_rule",
+        "text": "Convert NumPy arrays using .tolist()."
+      },
+      {
+        "id": "other_iterables_rule",
+        "text": "Convert any other non-serializable iterable into a standard Python list, dictionary, string, number, boolean, or null value."
+      }
+    ]
+  },
+  {
+    "id": "forbidden",
+    "titles": [
+      {
+        "id": "forbidden_types",
+        "text": "Never return pandas DataFrames, pandas Series, NumPy arrays, iterators, generators, views, file handles, pathlib.Path objects, or any other non-serializable object."
+      },
+      {
+        "id": "forbidden_methods",
+        "text": "Never return .values, .iterrows(), .items(), .iteritems(), .to_numpy(), or generator expressions."
+      }
+    ]
+  },
+  {
+    "id": "output",
+    "titles": [
+      {
+        "id": "output_text",
+        "text": "Return a JSON object with a single key 'code' containing the rewritten Python function as a string. Do not include markdown code fences. Do not include explanations. Do not include any function definitions other than build."
+      }
+    ]
+  }
+]

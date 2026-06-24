@@ -1,0 +1,16 @@
+
+  [
+    {
+      "id": "intro",
+      "titles": [
+        {"id": "intro_text", "text": "You are a helpful assistant..."}
+      ]
+    },
+    {
+      "id": "task",
+      "titles": [
+        {"id": "task_line_1", "text": "Given the following directory tree..."},
+        {"id": "task_line_2", "text": "Return a JSON list of file paths to process."}
+      ]
+    }
+  ]

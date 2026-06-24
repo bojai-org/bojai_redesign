@@ -21,10 +21,10 @@ Agents defined here:
     process_response() parses a JSON array and validates every path against
     the tree before returning.
 
-- CodeExtractionAgent(Agent, CodeRunner):
+- CodeExtractionAgent(Agent, CodeValidator):
     Given the full source of one or more files, asks the LLM to extract a
     clean build() function. process_response() validates the extracted code
-    through all six AST guards in CodeRunner before returning the sanitized
+    through all six AST guards in CodeValidator before returning the sanitized
     source string.
 
 - DecisionAgent(Agent):
@@ -38,24 +38,16 @@ Agents defined here:
     a JSON object and validates that every value is str, int, float, or bool
     before returning the typed dict.
 """
-
-from abc import ABC, abstractmethod
-from typing import Any
 import json
-import re
-from pathlib import Path, PurePosixPath
-
-from llm_config.router import ask_llm
-from build.prompt import PromptComposite, PromptLeaf
 from build.base_classes import Agent, SimpleAgent
-from enum import Enum
 from build.data.utils import CodeValidator
+from pathlib import Path
 MAX_TRIES = 5
 
 class ChoiceAgent(Agent):
     """Base class for choice agents."""
 
-    def __init__(self, name, address: list, LLM_config: dict, data_description: str | bool = False):
+    def __init__(self, name, address: list, LLM_config: dict, data_description: str | None = None):
         super().__init__(LLM_config)
         self.address = address
         self.dir_tree = self._build_directory_tree()
@@ -100,7 +92,7 @@ class FileChoiceAgent(ChoiceAgent):
 
 
 class CodeExtractionAgent(Agent, CodeValidator):
-    def __init__(self, name, long_code: str, LLM_config: dict, data_description: str | bool = False):
+    def __init__(self, name, long_code: str, LLM_config: dict, data_description: str | None = None):
         super().__init__(LLM_config)
         self.long_code = long_code
         self.name = name
@@ -123,7 +115,7 @@ class CodeExtractionAgent(Agent, CodeValidator):
 class DecisionAgent(Agent):
     """Reviews a list of candidates and confirms which ones to keep (true/false per entry)."""
 
-    def __init__(self, name, selected_files: list[str], dir_tree: dict, LLM_config: dict, data_description: str | bool = False):
+    def __init__(self, name, selected_files: list[str], dir_tree: dict, LLM_config: dict, data_description: str | None = None):
         super().__init__(LLM_config)
         self.selected_files = selected_files
         self.dir_tree = dir_tree
@@ -182,7 +174,7 @@ class DataDescriptionAgent(SimpleAgent):
 class HyperparameterAgent(Agent):
     """Reads confirmed files and extracts hyperparameters as a typed dict."""
 
-    def __init__(self, name: str, files: list[str], LLM_config: dict, data_description: str | bool = False):
+    def __init__(self, name: str, files: list[str], LLM_config: dict, data_description: str | None = None):
         super().__init__(LLM_config)
         self.name = name
         self.files = files

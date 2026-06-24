@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.coverage
+.vscode/
+.claude/
+node_modules/
+out/
+processed_data.csv

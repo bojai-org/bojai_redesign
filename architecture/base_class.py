@@ -48,10 +48,10 @@ def required(func):
     def wrapper(*args, **kwargs):
         ret = None
         try:
-            ret = func(*args, **kwargs)        
+            ret = func(*args, **kwargs)
         except NotImplementedError:
             raise NotImplementedError(f"{func.__name__} is required but not implemented.")
-        if ret == None:
+        if ret is None:
             raise NotImplementedError(f"{func.__name__} is required but not implemented.")
         return ret
     return wrapper

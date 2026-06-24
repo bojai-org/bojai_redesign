@@ -22,7 +22,7 @@ Components defined here:
     all downstream components.
 """
 
-from architecture.base_class import Data, Logger, PipelineComponent
+from architecture.base_class import Data
 
 from abc import ABC, abstractmethod
 from typing import Any, Sequence

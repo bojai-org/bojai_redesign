@@ -21,7 +21,7 @@ class TrainingComponents:
 class ChooseThenRunCodePipeline(Pipeline, ABC):
     """Abstract pipeline that selects code files, extracts code, validates it, and runs it."""
 
-    def __init__(self, choice_name, decision_name, validation_name, extraction_name,  LLM_config: dict, context: str):
+    def __init__(self, choice_name, decision_name, validation_name, extraction_name,  LLM_config: dict, context: str | None):
         super().__init__(LLM_config)
         self.choice_name = choice_name
         self.decision_name = decision_name
@@ -69,7 +69,7 @@ class HyperparameterPipeline(Pipeline):
 class TokenizationPipeline(ChooseThenRunCodePipeline, CodeRunner, CodeValidator):
     """Finds and extracts tokenizer code, with optional context from earlier pipeline stages."""
 
-    def __init__(self, pipeline_address: list, LLM_config: dict, context: str | bool = False):
+    def __init__(self, pipeline_address: list, LLM_config: dict, context: str | None = None):
         super().__init__("tokenizer_choice", "tokenizer_decision", "tokenizer_code_validation", "tokenizer_code_extraction", LLM_config, context)   
         self.address = pipeline_address
         self.context = context
@@ -96,7 +96,7 @@ class TokenizationPipeline(ChooseThenRunCodePipeline, CodeRunner, CodeValidator)
 class ModelPipeline(ChooseThenRunCodePipeline, CodeRunner, CodeValidator):
     """Finds and extracts model code, with optional context from earlier pipeline stages."""
 
-    def __init__(self, pipeline_address: list, LLM_config: dict, context: str | bool = False):
+    def __init__(self, pipeline_address: list, LLM_config: dict, context: str | None = None):
         super().__init__("model_choice", "model_decision", "model_code_validation", "model_code_extraction", LLM_config, context)
         self.address = pipeline_address
         self.context = context

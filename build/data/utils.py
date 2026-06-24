@@ -210,7 +210,7 @@ class CodeValidator:
         validation_name: str,
         LLM_config: dict,
         initial_files: list,
-        data_description: str | bool = False,
+        data_description: str | None = None,
         max_attempts: int = 3,
     ) -> str:
         # Local import to avoid circular dependency (build.agents imports CodeValidator).

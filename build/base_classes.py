@@ -24,7 +24,7 @@ Components defined here:
 
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, List
 import json
 import re
 from pathlib import Path, PurePosixPath
@@ -67,9 +67,9 @@ class Agent(ABC):
 
         return root
 
-    def _prompt_config(self, data_description : bool | str = False) -> dict:
+    def _prompt_config(self, data_description: str | None = None) -> dict:
         base = {"name": self.LLM_config["name"]}
-        if type(data_description) == str:
+        if data_description is not None:
             base["Pipeline data form description"] = data_description
         return base
         
@@ -180,6 +180,7 @@ class Pipeline(ABC):
         pass
 
     async def _select_code_files(self, choice_name, decision_name) -> List[str]:
+        from build.agents import FileChoiceAgent, DecisionAgent
         choice_agent = FileChoiceAgent(choice_name, self.address, self.LLM_config, self.context)
         selected_files = await choice_agent.run()  
         decision_agent = DecisionAgent(decision_name, selected_files, choice_agent.dir_tree, self.LLM_config, self.context)

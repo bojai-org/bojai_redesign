@@ -1,0 +1,20 @@
+.canvas {
+  position: relative;
+  flex: 1;
+  height: 640px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.flow {
+  width: 100%;
+  height: 100%;
+}
+
+.empty {
+  position: absolute;
+  inset: 16px;
+  z-index: 5;
+}

@@ -1,0 +1,98 @@
+.node {
+  width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  --xy-handle-background-color: var(--bj-500);
+  --xy-handle-border-color: var(--bj-500);
+}
+
+.node.invalid {
+  border-color: var(--rose);
+}
+
+.node.selected {
+  border-color: var(--bj-500);
+  box-shadow: 0 0 0 2px var(--bj-200);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.type {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--bj-600);
+}
+
+.validMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--teal);
+  background: var(--teal-100);
+  flex-shrink: 0;
+}
+
+.label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.targetHandle {
+  --xy-handle-background-color: var(--muted);
+  --xy-handle-border-color: var(--muted);
+}
+
+.handleList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+
+.handleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 16px;
+}
+
+.handleLabel {
+  font-size: 11px;
+  color: var(--ink-700);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addRouteRow .handleLabel {
+  color: var(--bj-600);
+  font-weight: 600;
+}
+
+.inlineHandle {
+  flex-shrink: 0;
+}

@@ -1,0 +1,93 @@
+.gates {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gate {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.gateHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gateName {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.gateType {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.gateTotal {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 96px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+}
+
+.actionLabel {
+  font-size: 11.5px;
+  color: var(--ink-700);
+  font-family: var(--font-mono);
+}
+
+.track {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+}
+
+.pass {
+  background: var(--teal);
+}
+
+.review {
+  background: var(--amber);
+}
+
+.block {
+  background: var(--rose);
+}
+
+.other {
+  background: var(--bj-400);
+}
+
+.count {
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

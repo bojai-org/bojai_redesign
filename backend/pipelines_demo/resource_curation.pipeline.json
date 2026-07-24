@@ -1,0 +1,60 @@
+{
+  "config": {
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  },
+  "entrypoint": "decision",
+  "max_steps": 20,
+  "nodes": {
+    "decision": {
+      "type": "Decision_Agent",
+      "prev": -1,
+      "context": "Choose 'reranked' to search the corpus and have the LLM re-rank the results before answering, or 'iterative' to search, check whether it found enough, and search again if not before answering.",
+      "options": ["reranked", "iterative"],
+      "reranked": "search_for_rerank",
+      "iterative": "search"
+    },
+    "search_for_rerank": {
+      "type": "Hybrid_Agent",
+      "prev": "decision",
+      "corpus_address": "backend/pipelines_demo/corpus_clinical",
+      "top_k": 4,
+      "next": "reranker"
+    },
+    "reranker": {
+      "type": "Reranker_Agent",
+      "prev": "search_for_rerank",
+      "top_k": 2,
+      "next": "answer_reranked"
+    },
+    "answer_reranked": {
+      "type": "Direct_Answer_Agent",
+      "prev": "reranker",
+      "next": -1
+    },
+    "search": {
+      "type": "Hybrid_Agent",
+      "prev": "decision",
+      "corpus_address": "backend/pipelines_demo/corpus_clinical",
+      "top_k": 1,
+      "next": "sufficiency"
+    },
+    "sufficiency": {
+      "type": "Binary_Judge_Agent",
+      "prev": "search",
+      "routes": {"yes": "answer_search", "no": "search_more"}
+    },
+    "search_more": {
+      "type": "Hybrid_Agent",
+      "prev": "sufficiency",
+      "corpus_address": "backend/pipelines_demo/corpus_clinical",
+      "top_k": 2,
+      "next": "answer_search"
+    },
+    "answer_search": {
+      "type": "Direct_Answer_Agent",
+      "prev": ["sufficiency", "search_more"],
+      "next": -1
+    }
+  }
+}

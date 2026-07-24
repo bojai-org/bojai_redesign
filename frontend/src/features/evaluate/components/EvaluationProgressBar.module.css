@@ -1,0 +1,41 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.count {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bj-100);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+  background: var(--bj-600);
+  transition: width 0.2s ease-out;
+}

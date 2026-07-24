@@ -1,0 +1,93 @@
+.link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.card {
+  overflow: hidden;
+}
+
+.thumb {
+  height: 86px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bj-100) 0 10px,
+    #fff 10px 20px
+  );
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.thumbGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arrow {
+  color: var(--bj-400);
+  font-size: 14px;
+}
+
+.node {
+  width: 34px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1.5px solid var(--bj-500);
+  display: inline-block;
+}
+
+.node.dark {
+  border-color: var(--ink-700);
+}
+
+.node.teal {
+  border-color: var(--teal);
+}
+
+.body {
+  padding: 14px 16px 16px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.name {
+  margin: 0 0 4px;
+  font-size: 14.5px;
+}
+
+.description {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tagRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+}

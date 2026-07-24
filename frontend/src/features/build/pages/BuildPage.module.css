@@ -1,0 +1,35 @@
+.workspace {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.libraryRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.libraryRow > :first-child {
+  flex: 1;
+}
+
+.clearButton {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--rose);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.clearButton:hover {
+  background: var(--rose-100);
+  border-color: var(--rose);
+}
+

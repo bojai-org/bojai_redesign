@@ -1,0 +1,31 @@
+.crumbs {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crumbs a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.crumbs a:hover {
+  color: var(--bj-700);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.separator {
+  color: var(--muted);
+}
+
+.current {
+  color: var(--ink);
+  font-weight: 600;
+}

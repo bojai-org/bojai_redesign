@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BojAI — Chatbot Pipeline Builder (UI Mockup)</title>
+<style>
+  :root{
+    --bj-950:#230a42; --bj-900:#341257; --bj-800:#4a1878; --bj-700:#5e219a;
+    --bj-600:#7228b8; --bj-500:#8b3fd1; --bj-400:#a664e0; --bj-200:#dcc4f2;
+    --bj-100:#ede0fa; --bj-50:#faf7fd;
+    --teal:#12897d; --teal-100:#d9f0ec; --amber:#c9762f; --amber-100:#f6e6d6;
+    --rose:#c23b4e; --rose-100:#f8dde1;
+    --ink:#211a30; --ink-700:#4a4358; --muted:#7a7188; --border:#e6def2;
+    --surface:#ffffff; --bg:#f6f3fa; --radius:14px;
+    --shadow: 0 1px 2px rgba(35,10,66,.06), 0 8px 24px -12px rgba(35,10,66,.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;}
+  svg.icon{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;}
+
+  .topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:14px;position:sticky;top:0;z-index:80;}
+  .brand{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;}
+  .brand-mark{width:26px;height:26px;flex:none;}
+  .brand-name{font-weight:700;font-size:15.5px;letter-spacing:.2px;color:var(--ink);}
+  .brand-name b{color:var(--bj-700);}
+  .crumbs{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .crumbs .cur{color:var(--ink);font-weight:600;}
+  .topbar-spacer{flex:1;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--bj-600),var(--bj-400));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+
+  .btn{appearance:none;border:1px solid var(--border);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:10px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:.15s;}
+  .btn:hover{border-color:var(--bj-400);color:var(--bj-700);}
+  .btn-primary{background:linear-gradient(135deg,var(--bj-700),var(--bj-500));border:none;color:#fff;box-shadow:0 4px 14px -4px rgba(114,40,184,.55);}
+  .btn-primary:hover{filter:brightness(1.06);color:#fff;}
+  .btn-ghost{border-color:transparent;background:transparent;}
+  .btn-ghost:hover{background:var(--bj-50);}
+  .btn-sm{padding:6px 10px;font-size:12.5px;border-radius:8px;}
+  .btn-danger-ghost{color:var(--rose);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .segmented{display:inline-flex;background:var(--bj-50);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px;}
+  .segmented button{border:none;background:transparent;padding:7px 13px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .segmented button.active{background:var(--surface);color:var(--bj-700);box-shadow:var(--shadow);}
+
+  .screen{display:none;} .screen.active{display:block;}
+
+  /* ===== WELCOME ===== */
+  .hero{background:linear-gradient(160deg,var(--bj-950) 0%,var(--bj-700) 55%,var(--bj-500) 100%);padding:38px 32px 46px;color:#fff;position:relative;overflow:hidden;}
+  .hero::after{content:"";position:absolute;right:-60px;top:-80px;width:320px;height:320px;background:radial-gradient(circle at center, rgba(255,255,255,.10), transparent 60%);}
+  .hero-inner{max-width:1180px;margin:0 auto;position:relative;z-index:1;}
+  .hero h1{font-size:26px;margin:0 0 6px;font-weight:700;}
+  .hero p{margin:0;opacity:.85;font-size:14.5px;max-width:560px;}
+  .hero-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+  .welcome-body{max-width:1180px;margin:0 auto 60px;padding:32px 32px 0;}
+  .stats-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);}
+  .stat-card .num{font-size:22px;font-weight:700;color:var(--bj-700);}
+  .stat-card .lbl{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin:28px 0 14px;}
+  .section-title h2{font-size:15px;margin:0;color:var(--ink);}
+  .section-title .hint{font-size:12.5px;color:var(--muted);}
+  .project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:16px;}
+  .project-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0;overflow:hidden;cursor:pointer;transition:.15s;box-shadow:var(--shadow);}
+  .project-card:hover{transform:translateY(-2px);border-color:var(--bj-400);}
+  .project-thumb{height:86px;background:repeating-linear-gradient(135deg,var(--bj-100) 0 10px,#fff 10px 20px);border-bottom:1px solid var(--border);position:relative;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .thumb-node{width:34px;height:22px;border-radius:6px;background:var(--surface);border:1.5px solid var(--bj-500);}
+  .thumb-node.dark{border-color:var(--ink-700);} .thumb-node.teal{border-color:var(--teal);}
+  .thumb-arrow{color:var(--bj-400);font-size:14px;}
+  .project-body{padding:14px 16px 16px;}
+  .project-body h3{margin:0 0 4px;font-size:14.5px;}
+  .project-body p{margin:0 0 10px;font-size:12.5px;color:var(--muted);line-height:1.4;}
+  .tag-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:var(--bj-100);color:var(--bj-700);}
+  .tag.muted{background:var(--bg);color:var(--muted);}
+  .project-meta{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:11.5px;color:var(--muted);}
+  .new-project-card{border:1.5px dashed var(--bj-400);border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:186px;color:var(--bj-700);cursor:pointer;font-weight:600;font-size:13.5px;background:var(--bj-50);}
+  .new-project-card:hover{background:var(--bj-100);}
+  .new-project-card .plus-circle{width:36px;height:36px;border-radius:50%;background:#fff;border:1.5px solid var(--bj-400);display:flex;align-items:center;justify-content:center;}
+
+  /* ===== PROJECT SHELL ===== */
+  .proj-subnav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;padding:0 24px;position:sticky;top:56px;z-index:70;}
+  .proj-subnav button{border:none;background:transparent;padding:13px 16px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;position:relative;display:flex;align-items:center;gap:7px;}
+  .proj-subnav button.active{color:var(--bj-700);}
+  .proj-subnav button.active::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2.5px;background:var(--bj-600);border-radius:2px;}
+  .tabpanel{display:none;} .tabpanel.active{display:block;}
+
+  /* ===== PIPELINE TAB — real node editor ===== */
+  .pipeline-shell{display:flex;height:calc(100vh - 56px - 47px);}
+  .palette{width:250px;flex:none;background:var(--surface);border-right:1px solid var(--border);padding:16px 14px;overflow-y:auto;}
+  .palette h4{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 8px;}
+  .palette h4:first-child{margin-top:0;}
+  .palette-hint{font-size:12px;color:var(--muted);line-height:1.5;background:var(--bj-50);border:1px solid var(--bj-100);padding:9px 10px;border-radius:10px;margin-bottom:4px;}
+  .block-chip{display:flex;align-items:center;gap:9px;padding:9px 10px;margin-bottom:7px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:grab;font-size:13px;font-weight:600;}
+  .block-chip:active{cursor:grabbing;}
+  .block-chip:hover{border-color:var(--bj-400);background:var(--bj-50);}
+  .block-chip .ic{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex:none;color:#fff;}
+  .block-chip .ic.safety{background:linear-gradient(135deg,var(--bj-700),var(--bj-500));}
+  .block-chip .ic.answer{background:var(--ink-700);}
+  .block-chip .sub{font-size:11px;color:var(--muted);font-weight:500;display:block;}
+
+  .canvas-wrap{flex:1;position:relative;overflow:auto;background:radial-gradient(circle,#e3d9f2 1px,transparent 1.4px) 0 0/18px 18px,var(--bg);}
+  .canvas-toolbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.85);backdrop-filter:blur(4px);position:sticky;top:0;left:0;z-index:20;}
+  .canvas-toolbar .name{font-weight:700;font-size:14px;}
+  .canvas-toolbar .sub{font-size:12px;color:var(--muted);}
+  #canvas-stage{position:relative;width:1480px;height:460px;margin:30px 40px 60px;}
+  #canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
+  #canvas.drop-hover{outline:2px dashed var(--bj-400);outline-offset:8px;}
+
+  .barrier-zone{position:absolute;border:1.5px dashed var(--bj-500);border-radius:14px;background:rgba(139,63,209,.05);}
+  .barrier-label{position:absolute;top:-11px;left:14px;background:var(--bj-600);color:#fff;font-size:10px;font-weight:700;letter-spacing:.6px;padding:3px 9px;border-radius:20px;text-transform:uppercase;}
+  .barrier-empty-hint{position:absolute;top:44px;left:0;right:0;text-align:center;font-size:11px;color:var(--bj-500);padding:0 14px;}
+
+  .fnode{position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:9px 12px;box-shadow:var(--shadow);cursor:grab;user-select:none;z-index:5;}
+  .fnode:active{cursor:grabbing;}
+  .fnode.selected{border-color:var(--bj-600);box-shadow:0 0 0 3px rgba(114,40,184,.18),var(--shadow);}
+  .fnode.round{border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;}
+  .fnode .n-top{display:flex;align-items:center;gap:8px;pointer-events:none;}
+  .fnode .n-ic{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none;}
+  .fnode.round .n-ic{width:20px;height:20px;border-radius:50%;}
+  .fnode .n-title{font-size:12.5px;font-weight:700;line-height:1.2;pointer-events:none;}
+  .fnode.round .n-title{font-size:10px;margin-top:2px;}
+  .fnode .n-sub{font-size:10.5px;color:var(--muted);margin-top:1px;pointer-events:none;}
+  .ic-teal{background:var(--teal);} .ic-purple{background:linear-gradient(135deg,var(--bj-700),var(--bj-500));}
+  .ic-ink{background:var(--ink-700);} .ic-rose{background:var(--rose);}
+
+  .close-btn{position:absolute;top:-8px;right:-8px;width:18px;height:18px;border-radius:50%;background:var(--rose);color:#fff;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:.15s;z-index:6;}
+  .fnode:hover .close-btn{opacity:1;}
+  .port{position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid var(--bj-500);top:50%;transform:translateY(-50%);cursor:crosshair;z-index:7;}
+  .port.out{right:-7px;} .port.in{left:-7px;}
+  .port:hover{background:var(--bj-500);transform:translateY(-50%) scale(1.15);}
+
+  #edge-svg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;}
+  #edge-svg path.e-solid{stroke:#b493db;stroke-width:2;fill:none;}
+  #edge-svg path.e-dark{stroke:#b7b0c4;stroke-width:2;fill:none;}
+  #edge-svg path.e-dashed{stroke:var(--rose);stroke-width:1.6;stroke-dasharray:5 4;fill:none;}
+  #edge-svg path.e-loop{stroke:#b7b0c4;stroke-width:1.6;stroke-dasharray:5 4;fill:none;}
+  #edge-svg path.e-hit{stroke:transparent;stroke-width:14;fill:none;pointer-events:stroke;cursor:pointer;}
+  #edge-svg path.e-hit:hover + path{stroke:var(--bj-600);}
+  #edge-svg .e-del{pointer-events:all;cursor:pointer;}
+  #edge-svg .e-del circle{fill:#fff;stroke:var(--rose);stroke-width:1.5;}
+  #edge-svg .e-del text{fill:var(--rose);font-size:10px;font-weight:700;}
+  #edge-svg .e-label{fill:var(--muted);font-size:10px;}
+  #temp-edge{stroke:var(--bj-600);stroke-width:2;fill:none;stroke-dasharray:4 3;}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;padding:10px 20px;border-top:1px solid var(--border);background:rgba(255,255,255,.6);font-size:11.5px;color:var(--muted);position:sticky;bottom:0;left:0;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  .inspector{position:absolute;top:66px;right:16px;width:220px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:14px;z-index:30;display:none;}
+  .inspector.show{display:block;}
+  .inspector .ni-title{font-size:13.5px;font-weight:700;}
+  .inspector .ni-sub{font-size:11.5px;color:var(--muted);margin:2px 0 10px;}
+  .inspector .ni-actions{display:flex;flex-direction:column;gap:7px;}
+
+  /* ===== PROMPTS TAB ===== */
+  .prompts-shell{display:flex;gap:0;height:calc(100vh - 56px - 47px);}
+  .prompt-list{width:250px;flex:none;background:var(--surface);border-right:1px solid var(--border);padding:14px;overflow-y:auto;}
+  .prompt-item{padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-700);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;}
+  .prompt-item .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);flex:none;}
+  .prompt-item:hover{background:var(--bj-50);}
+  .prompt-item.active{background:var(--bj-100);color:var(--bj-700);}
+  .prompt-editor{flex:1;padding:24px 30px;overflow-y:auto;}
+  .prompt-editor-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
+  .prompt-editor-head h2{margin:0;font-size:17px;}
+  .prompt-editor-head .meta{font-size:12px;color:var(--muted);margin-top:3px;}
+  .var-row{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 14px;}
+  .var-chip{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:var(--ink);color:#f1e9fb;padding:4px 9px;border-radius:6px;cursor:pointer;}
+  textarea.prompt-box{width:100%;min-height:300px;border:1px solid var(--border);border-radius:12px;padding:16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;color:var(--ink);resize:vertical;background:#fff;box-shadow:var(--shadow);}
+  textarea.prompt-box:focus{outline:none;border-color:var(--bj-500);}
+  .editor-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+
+  /* ===== EVALUATION TAB ===== */
+  .eval-shell{max-width:1180px;margin:0 auto;padding:26px 32px 60px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .eval-setup{padding:20px 22px;margin-bottom:22px;}
+  .eval-setup-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .eval-setup-head h3{margin:0;font-size:15px;}
+  .dataset-panel{display:none;} .dataset-panel.active{display:block;}
+  table.manual-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px;}
+  table.manual-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--border);}
+  table.manual-table td{padding:6px 8px;border-bottom:1px solid var(--border);}
+  table.manual-table input{width:100%;border:1px solid transparent;background:var(--bg);border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;}
+  table.manual-table input:focus{outline:none;border-color:var(--bj-400);background:#fff;}
+  .row-del{color:var(--rose);cursor:pointer;font-size:12px;font-weight:700;padding:4px 6px;}
+  .dropzone{border:1.5px dashed var(--border);border-radius:12px;padding:26px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;}
+  .dropzone:hover{border-color:var(--bj-400);background:var(--bj-50);}
+  .file-chip{display:flex;align-items:center;gap:10px;background:var(--bj-50);border:1px solid var(--bj-100);border-radius:10px;padding:10px 14px;margin-top:12px;}
+  .file-chip .fic{width:32px;height:32px;border-radius:8px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
+  .file-chip .fname{font-weight:700;font-size:13px;}
+  .file-chip .fsub{font-size:11.5px;color:var(--muted);}
+  .run-row{display:flex;justify-content:flex-end;margin-top:16px;gap:10px;align-items:center;}
+  .run-row .note{font-size:11.5px;color:var(--muted);margin-right:auto;}
+
+  .results-wrap{display:none;} .results-wrap.show{display:block;}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .stat-grid .stat-card .num{font-size:24px;}
+  .stat-card.good .num{color:var(--teal);}
+
+  .compare-table-wrap{overflow-x:auto;}
+  table.compare{width:100%;border-collapse:collapse;font-size:12.8px;min-width:900px;}
+  table.compare th{text-align:left;background:var(--bj-50);color:var(--ink-700);font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:10px 12px;position:sticky;top:0;}
+  table.compare td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--ink-700);}
+  table.compare td.q{font-weight:700;color:var(--ink);max-width:170px;}
+  table.compare td.txt{max-width:230px;}
+  table.compare tr:hover td{background:var(--bj-50);}
+  .clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap;}
+  .badge.ok{background:var(--teal-100);color:var(--teal);}
+  .badge.no{background:var(--rose-100);color:var(--rose);}
+  .sim-bar-wrap{width:70px;height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:5px;}
+  .sim-bar{height:100%;background:linear-gradient(90deg,var(--bj-500),var(--bj-700));}
+  .link-pill{font-size:11px;color:var(--bj-700);text-decoration:none;display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* ===== SETTINGS TAB ===== */
+  .settings-shell{max-width:820px;margin:0 auto;padding:28px 32px 60px;}
+  .settings-card{padding:22px 24px;margin-bottom:20px;}
+  .settings-card h3{margin:0 0 4px;font-size:15px;}
+  .settings-card .desc{font-size:12.5px;color:var(--muted);margin:0 0 16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-700);margin-bottom:6px;}
+  .field input[type=text],.field input[type=password],.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13.5px;font-family:inherit;color:var(--ink);background:#fff;}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--bj-500);}
+  .field textarea{min-height:70px;resize:vertical;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .key-wrap{position:relative;}
+  .key-wrap .eye{position:absolute;right:10px;top:9px;cursor:pointer;color:var(--muted);user-select:none;}
+  .provider-tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .provider-tab{flex:1;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;background:#fff;}
+  .provider-tab.active{border-color:var(--bj-500);background:var(--bj-50);}
+  .provider-tab .p-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;}
+  .provider-tab .p-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .provider-panel{display:none;} .provider-panel.active{display:block;}
+  .danger-zone{border-color:var(--rose-100);}
+  .danger-zone h3{color:var(--rose);}
+
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;z-index:999;box-shadow:var(--shadow);}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand" onclick="goHome()">
+    <svg class="brand-mark" viewBox="0 0 100 100">
+      <g fill="none" stroke="#c9b4e6" stroke-width="4">
+        <rect x="30" y="10" width="34" height="34" transform="rotate(45 47 27)"/>
+        <rect x="10" y="30" width="34" height="34" transform="rotate(45 27 47)"/>
+        <rect x="50" y="30" width="34" height="34" transform="rotate(45 67 47)"/>
+        <rect x="30" y="50" width="34" height="34" transform="rotate(45 47 67)"/>
+      </g>
+      <rect x="32" y="32" width="30" height="30" transform="rotate(45 47 47)" fill="none" stroke="#7228b8" stroke-width="6"/>
+    </svg>
+    <span class="brand-name">Boj<b>AI</b></span>
+  </div>
+  <div class="crumbs" id="crumbs"><span>Projects</span></div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-right">
+    <button class="btn btn-ghost btn-sm"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Docs</button>
+    <div class="avatar">S</div>
+  </div>
+</div>
+
+<!-- ============ WELCOME ============ -->
+<div class="screen active" id="screen-welcome">
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="hero-row">
+        <div>
+          <h1>Build safe, evaluable healthcare chatbots — no ML engineering required.</h1>
+          <p>Assemble safety agents and answer agents into a pipeline, tune prompts, and evaluate against your own Q&A datasets — all in one workspace.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openProject()">
+          <svg class="icon" viewBox="0 0 24 24" stroke="white"><path d="M12 5v14M5 12h14"/></svg>New project
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="welcome-body">
+    <div class="stats-strip">
+      <div class="stat-card"><div class="num">3</div><div class="lbl">Active projects</div></div>
+      <div class="stat-card"><div class="num">7</div><div class="lbl">Pipelines built</div></div>
+      <div class="stat-card"><div class="num">60%</div><div class="lbl">Best doc-match accuracy</div></div>
+      <div class="stat-card"><div class="num">4</div><div class="lbl">Answer agent types available</div></div>
+    </div>
+
+    <div class="section-title"><h2>Your projects</h2><span class="hint">Sorted by last edited</span></div>
+    <div class="project-grid">
+      <div class="new-project-card" onclick="openProject()">
+        <div class="plus-circle"><svg class="icon" viewBox="0 0 24 24" style="stroke:#7228b8"><path d="M12 5v14M5 12h14"/></svg></div>
+        Start a new project
+      </div>
+      <div class="project-card" onclick="openProject()">
+        <div class="project-thumb"><div class="thumb-node teal"></div><span class="thumb-arrow">→</span><div class="thumb-node"></div><span class="thumb-arrow">→</span><div class="thumb-node dark"></div></div>
+        <div class="project-body">
+          <h3>Bipolar Disorder Support Bot</h3>
+          <p>Safety-gated Q&A assistant over the CREST.BD self-management resource library.</p>
+          <div class="tag-row"><span class="tag">Retrieval + Choice</span><span class="tag muted">3 safety layers</span></div>
+          <div class="project-meta"><span>Edited today</span><span>10-Q eval set</span></div>
+        </div>
+      </div>
+      <div class="project-card" onclick="openProject()">
+        <div class="project-thumb"><div class="thumb-node teal"></div><span class="thumb-arrow">→</span><div class="thumb-node dark"></div></div>
+        <div class="project-body">
+          <h3>Diabetes Coaching Assistant</h3>
+          <p>Keyword-retrieval pipeline for nutrition & medication adherence FAQs.</p>
+          <div class="tag-row"><span class="tag">Keyword Retrieval</span><span class="tag muted">1 safety layer</span></div>
+          <div class="project-meta"><span>Edited 2 days ago</span><span>Draft</span></div>
+        </div>
+      </div>
+      <div class="project-card" onclick="openProject()">
+        <div class="project-thumb"><div class="thumb-node teal"></div><span class="thumb-arrow">→</span><div class="thumb-node"></div><span class="thumb-arrow">→</span><div class="thumb-node"></div></div>
+        <div class="project-body">
+          <h3>Post-Op Recovery Triage</h3>
+          <p>Coding + choice agent hybrid for symptom-severity routing.</p>
+          <div class="tag-row"><span class="tag">Coding Agent</span><span class="tag muted">2 safety layers</span></div>
+          <div class="project-meta"><span>Edited 1 week ago</span><span>Archived</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PROJECT WORKSPACE ============ -->
+<div class="screen" id="screen-project">
+
+  <div class="proj-subnav">
+    <button class="active" data-tab="pipeline" onclick="showTab('pipeline')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a3 3 0 0 1 3 3v3"/></svg>Pipeline</button>
+    <button data-tab="prompts" onclick="showTab('prompts')"><svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4z"/></svg>Prompts</button>
+    <button data-tab="evaluation" onclick="showTab('evaluation')"><svg class="icon" viewBox="0 0 24 24"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>Evaluation</button>
+    <button data-tab="settings" onclick="showTab('settings')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+  </div>
+
+  <!-- ---------- PIPELINE TAB (functional editor) ---------- -->
+  <div class="tabpanel active" id="tab-pipeline">
+    <div class="pipeline-shell">
+      <div class="palette">
+        <div class="palette-hint">Drag a block onto the canvas. Safety agents automatically stack inside the vertical barrier. Answer agents drop anywhere and connect via drag-from-dot.</div>
+        <h4>Safety agents</h4>
+        <div class="block-chip" draggable="true" data-kind="static_filter" ondragstart="onChipDragStart(event)"><div class="ic safety"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg></div><div><div>Static Filter</div><span class="sub">Regex / keyword block-list</span></div></div>
+        <div class="block-chip" draggable="true" data-kind="simple_filter" ondragstart="onChipDragStart(event)"><div class="ic safety"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg></div><div><div>Simple Safety Filter</div><span class="sub">Cosine similarity classifier</span></div></div>
+        <div class="block-chip" draggable="true" data-kind="llm_filter" ondragstart="onChipDragStart(event)"><div class="ic safety"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg></div><div><div>LLM Safety Filter</div><span class="sub">Escalation via LLM judge</span></div></div>
+
+        <h4>Answer agents</h4>
+        <div class="block-chip" draggable="true" data-kind="choice_agent" ondragstart="onChipDragStart(event)"><div class="ic answer"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><path d="M9 18l6-12M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></div><div><div>Choice Agent</div><span class="sub">Routes to the best sub-agent</span></div></div>
+        <div class="block-chip" draggable="true" data-kind="coding_agent" ondragstart="onChipDragStart(event)"><div class="ic answer"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><path d="M9 18l6-12M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></div><div><div>Coding Agent</div><span class="sub">Executes computed answers</span></div></div>
+        <div class="block-chip" draggable="true" data-kind="retrieval_agent" ondragstart="onChipDragStart(event)"><div class="ic answer"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div><div><div>Retrieval Agent</div><span class="sub">Semantic search · RAG corpus</span></div></div>
+        <div class="block-chip" draggable="true" data-kind="keyword_agent" ondragstart="onChipDragStart(event)"><div class="ic answer"><svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div><div><div>Keyword Retrieval Agent</div><span class="sub">BM25 · RAG corpus</span></div></div>
+
+        <h4>Canvas</h4>
+        <button class="btn btn-sm" style="width:100%;justify-content:center;margin-bottom:6px;" onclick="resetPipeline()">Reset to blank skeleton</button>
+      </div>
+
+      <div class="canvas-wrap" id="canvas-wrap">
+        <div class="canvas-toolbar">
+          <div><div class="name">Bipolar Disorder Support Bot — pipeline</div><div class="sub" id="canvas-status">Autosaved a moment ago</div></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-sm" onclick="toast('Pipeline validated — no dangling ports found.')">Validate</button>
+            <button class="btn btn-primary btn-sm" onclick="toast('Pipeline saved.')">Save pipeline</button>
+          </div>
+        </div>
+
+        <div id="canvas-stage">
+          <div id="canvas"></div>
+          <svg id="edge-svg" width="1480" height="460"></svg>
+        </div>
+
+        <div class="inspector" id="inspector">
+          <div class="ni-title" id="ni-title">—</div>
+          <div class="ni-sub" id="ni-sub">—</div>
+          <div class="ni-actions">
+            <button class="btn btn-sm" id="ni-edit-prompt" onclick="jumpToPrompt()" style="display:none;">Edit prompt →</button>
+            <button class="btn btn-sm btn-danger-ghost" id="ni-delete" onclick="deleteSelectedNode()">Delete block</button>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span><i style="background:var(--bj-500)"></i>Safety agent (auto-wired)</span>
+          <span><i style="background:var(--ink-700)"></i>Answer agent (drag to connect)</span>
+          <span><i style="background:var(--teal)"></i>Start / end</span>
+          <span><i style="background:var(--rose)"></i>Rejected path</span>
+          <span>Click a connection dot (×) to delete it</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- PROMPTS TAB ---------- -->
+  <div class="tabpanel" id="tab-prompts">
+    <div class="prompts-shell">
+      <div class="prompt-list">
+        <div class="prompt-item active" data-p="choice" onclick="showPrompt(this,'choice')"><span>Choice Agent</span><span class="dot"></span></div>
+        <div class="prompt-item" data-p="retrieval" onclick="showPrompt(this,'retrieval')"><span>Retrieval Agent</span><span class="dot"></span></div>
+        <div class="prompt-item" data-p="keyword" onclick="showPrompt(this,'keyword')"><span>Keyword Retrieval Agent</span><span class="dot"></span></div>
+        <div class="prompt-item" data-p="final" onclick="showPrompt(this,'final')"><span>Final Answer</span><span class="dot"></span></div>
+        <div class="prompt-item" data-p="safety" onclick="showPrompt(this,'safety')"><span>LLM Safety Filter</span><span class="dot" style="background:var(--amber)"></span></div>
+      </div>
+
+      <div class="prompt-editor">
+        <div id="prompt-choice">
+          <div class="prompt-editor-head"><div><h2>Choice Agent Prompt</h2><div class="meta">Decides which answer agent branch to run next.</div></div><span class="tag">≤ 4 rounds</span></div>
+          <div class="var-row"><span class="var-chip" onclick="insertVar('choice','{{question}}')">{{question}}</span><span class="var-chip" onclick="insertVar('choice','{{chat_history}}')">{{chat_history}}</span><span class="var-chip" onclick="insertVar('choice','{{available_agents}}')">{{available_agents}}</span><span class="var-chip" onclick="insertVar('choice','{{round_number}}')">{{round_number}}</span></div>
+          <textarea class="prompt-box" id="ta-choice">You are the Decide Agent in a healthcare Q&A pipeline. Given the user question and the results so far, choose exactly one next action from {{available_agents}}.
+
+Question: {{question}}
+Round: {{round_number}} of 4
+
+Rules:
+- Prefer Retrieval Agent for factual, resource-grounded questions.
+- Prefer Keyword Retrieval Agent when the question contains specific named terms.
+- Choose "Answer" only when retrieved context is sufficient to answer safely and accurately.
+- Never fabricate a citation that isn't in the retrieved context.
+
+Respond with a single action name and a one-sentence justification.</textarea>
+          <div class="editor-actions"><button class="btn btn-sm" onclick="revertPrompt('choice')">Revert</button><button class="btn btn-primary btn-sm" onclick="savePrompt('choice')">Save prompt</button></div>
+        </div>
+
+        <div id="prompt-retrieval" style="display:none">
+          <div class="prompt-editor-head"><div><h2>Retrieval Agent Prompt</h2><div class="meta">Semantic search over the RAG corpus (FAISS).</div></div><span class="tag muted">FAISS · top-k 20</span></div>
+          <div class="var-row"><span class="var-chip" onclick="insertVar('retrieval','{{question}}')">{{question}}</span><span class="var-chip" onclick="insertVar('retrieval','{{top_k}}')">{{top_k}}</span></div>
+          <textarea class="prompt-box" id="ta-retrieval">Search the CREST.BD bipolar self-management corpus for the {{top_k}} passages most semantically relevant to:
+
+"{{question}}"
+
+Return each passage with its source URL and similarity score. Do not summarize — pass raw context to the Decide Agent for grounding.</textarea>
+          <div class="editor-actions"><button class="btn btn-sm" onclick="revertPrompt('retrieval')">Revert</button><button class="btn btn-primary btn-sm" onclick="savePrompt('retrieval')">Save prompt</button></div>
+        </div>
+
+        <div id="prompt-keyword" style="display:none">
+          <div class="prompt-editor-head"><div><h2>Keyword Retrieval Agent Prompt</h2><div class="meta">BM25 lexical search over the same RAG corpus.</div></div><span class="tag muted">BM25 · top-k 20</span></div>
+          <div class="var-row"><span class="var-chip" onclick="insertVar('keyword','{{question}}')">{{question}}</span></div>
+          <textarea class="prompt-box" id="ta-keyword">Extract the key terms from the user question below and run a BM25 keyword search over the corpus. Return the top matching passages with source URLs, ranked by keyword overlap score.
+
+Question: {{question}}</textarea>
+          <div class="editor-actions"><button class="btn btn-sm" onclick="revertPrompt('keyword')">Revert</button><button class="btn btn-primary btn-sm" onclick="savePrompt('keyword')">Save prompt</button></div>
+        </div>
+
+        <div id="prompt-final" style="display:none">
+          <div class="prompt-editor-head"><div><h2>Final Answer Prompt</h2><div class="meta">Synthesizes the final response once context is sufficient.</div></div><span class="tag muted">Runs once per query</span></div>
+          <div class="var-row"><span class="var-chip" onclick="insertVar('final','{{question}}')">{{question}}</span><span class="var-chip" onclick="insertVar('final','{{context}}')">{{context}}</span><span class="var-chip" onclick="insertVar('final','{{tone}}')">{{tone}}</span></div>
+          <textarea class="prompt-box" id="ta-final">Using only the retrieved context below, write a warm, accurate answer to the user's question about bipolar disorder self-management.
+
+Question: {{question}}
+Context: {{context}}
+
+Guidelines:
+- Cite sources inline like [[Source Title]].
+- Do not give medical directives — encourage consulting a healthcare provider for anything diagnostic.
+- Keep tone: {{tone}}.</textarea>
+          <div class="editor-actions"><button class="btn btn-sm" onclick="revertPrompt('final')">Revert</button><button class="btn btn-primary btn-sm" onclick="savePrompt('final')">Save prompt</button></div>
+        </div>
+
+        <div id="prompt-safety" style="display:none">
+          <div class="prompt-editor-head"><div><h2>LLM Safety Filter Prompt</h2><div class="meta">Escalation judge, only runs when the ML classifier is ambiguous.</div></div><span class="tag muted">Optional layer</span></div>
+          <div class="var-row"><span class="var-chip" onclick="insertVar('safety','{{question}}')">{{question}}</span><span class="var-chip" onclick="insertVar('safety','{{classifier_score}}')">{{classifier_score}}</span></div>
+          <textarea class="prompt-box" id="ta-safety">Classify whether the following question is in-scope for a bipolar disorder self-management assistant, or should be rejected (e.g. crisis, diagnosis requests, unrelated topics).
+
+Question: {{question}}
+Classifier confidence: {{classifier_score}}
+
+Respond with ACCEPT or REJECT and a brief reason.</textarea>
+          <div class="editor-actions"><button class="btn btn-sm" onclick="revertPrompt('safety')">Revert</button><button class="btn btn-primary btn-sm" onclick="savePrompt('safety')">Save prompt</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- EVALUATION TAB ---------- -->
+  <div class="tabpanel" id="tab-evaluation">
+    <div class="eval-shell">
+      <div class="card eval-setup">
+        <div class="eval-setup-head">
+          <h3>Evaluation dataset</h3>
+          <div class="segmented">
+            <button class="active" onclick="showDataset(this,'manual')">Manual entry</button>
+            <button onclick="showDataset(this,'upload')">Upload CSV</button>
+          </div>
+        </div>
+
+        <div class="dataset-panel active" id="ds-manual">
+          <table class="manual-table" id="manual-table">
+            <thead><tr><th style="width:28%">Question</th><th style="width:36%">Expected answer</th><th style="width:30%">Expected document</th><th style="width:6%"></th></tr></thead>
+            <tbody id="manual-tbody">
+              <tr><td><input value="how consistent do i have to be with my sleep schedule"></td><td><input value="Maintaining a consistent sleep and wake schedule is one of the most important self-management strategies for bipolar disorder."></td><td><input value="https://www.youtube.com/watch?v=7P-BWUy8tmY"></td><td><span class="row-del" onclick="removeManualRow(this)">✕</span></td></tr>
+              <tr><td><input placeholder="Type a question…"></td><td><input placeholder="Expected answer…"></td><td><input placeholder="Expected doc URL…"></td><td><span class="row-del" onclick="removeManualRow(this)">✕</span></td></tr>
+            </tbody>
+          </table>
+          <button class="btn btn-sm" onclick="addManualRow()">+ Add row</button>
+        </div>
+
+        <div class="dataset-panel" id="ds-upload">
+          <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="onCsvSelected(event)">
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault()" ondrop="onCsvDrop(event)">
+            Drag & drop a .csv with columns <code>question, expected_answer, expected_document</code>, or click to browse.
+          </div>
+          <div class="file-chip" id="file-chip" style="display:none;">
+            <div class="fic"><svg class="icon" style="stroke:#fff" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></div>
+            <div><div class="fname" id="file-name">—</div><div class="fsub" id="file-sub">—</div></div>
+          </div>
+        </div>
+
+        <div class="run-row">
+          <span class="note" id="dataset-note">Using demo dataset: chatbot_qa_pairs_2026-06-06.csv (10 rows)</span>
+          <button class="btn btn-primary" onclick="runEval()">
+            <svg class="icon" viewBox="0 0 24 24" style="stroke:#fff"><path d="M5 3l16 9-16 9V3z"/></svg>Run evaluation
+          </button>
+        </div>
+      </div>
+
+      <div class="results-wrap" id="eval-results">
+        <div class="section-title" style="margin-top:0;"><h2 id="results-title">Results</h2><span class="hint" id="results-sub">—</span></div>
+
+        <div class="stat-grid" id="stat-grid"></div>
+
+        <div class="card" style="padding:4px 0 0;">
+          <div class="compare-table-wrap">
+            <table class="compare">
+              <thead><tr><th>Question</th><th>Expected answer</th><th>System answer</th><th>Expected doc</th><th>Retrieved doc</th><th>Match</th></tr></thead>
+              <tbody id="compare-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:12px;">
+          <button class="btn btn-sm" id="show-all-btn" onclick="toggleShowAll()">Show all rows</button>
+          <button class="btn btn-sm" onclick="toast('Results exported as CSV.')">Export CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- SETTINGS TAB ---------- -->
+  <div class="tabpanel" id="tab-settings">
+    <div class="settings-shell">
+      <div class="card settings-card">
+        <h3>Project details</h3>
+        <p class="desc">Basic information shown on the projects page.</p>
+        <div class="field"><label>Project name</label><input type="text" value="Bipolar Disorder Support Bot"></div>
+        <div class="field"><label>Description</label><textarea>Safety-gated Q&A assistant over the CREST.BD self-management resource library, built for bipolar disorder researchers piloting conversational support tools.</textarea></div>
+        <div class="field-row">
+          <div class="field"><label>Owner</label><input type="text" value="Soghomon"></div>
+          <div class="field"><label>Owner email</label><input type="text" value="soghmon5@gmail.com"></div>
+        </div>
+      </div>
+
+      <div class="card settings-card">
+        <h3>LLM configuration</h3>
+        <p class="desc">Choose the provider powering every agent in this pipeline. Keys are stored encrypted and never shown in full.</p>
+        <div class="provider-tabs">
+          <div class="provider-tab active" onclick="showProvider(this,'aws')"><div class="p-title">AWS Bedrock</div><div class="p-sub">Claude, Titan & Llama via Bedrock</div></div>
+          <div class="provider-tab" onclick="showProvider(this,'anthropic')"><div class="p-title">Anthropic API</div><div class="p-sub">Direct Claude API access</div></div>
+          <div class="provider-tab" onclick="showProvider(this,'openai')"><div class="p-title">OpenAI API</div><div class="p-sub">GPT models via OpenAI</div></div>
+        </div>
+
+        <div class="provider-panel active" id="prov-aws">
+          <div class="field-row">
+            <div class="field"><label>Access key ID</label><div class="key-wrap"><input type="password" value="AKIAxxxxxxxxxxxxxxxx"><span class="eye" onclick="toggleKey(this)">👁</span></div></div>
+            <div class="field"><label>Secret access key</label><div class="key-wrap"><input type="password" value="secretxxxxxxxxxxxxxxxxxxxx"><span class="eye" onclick="toggleKey(this)">👁</span></div></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Region</label><select><option>us-east-1</option><option>us-west-2</option><option>eu-central-1</option></select></div>
+            <div class="field"><label>Model name</label><input type="text" value="anthropic.claude-3-5-sonnet-20241022-v2:0"></div>
+          </div>
+        </div>
+        <div class="provider-panel" id="prov-anthropic">
+          <div class="field"><label>API key</label><div class="key-wrap"><input type="password" value="sk-ant-xxxxxxxxxxxxxxxxxxxx"><span class="eye" onclick="toggleKey(this)">👁</span></div></div>
+          <div class="field"><label>Model name</label><input type="text" value="claude-sonnet-4-5"></div>
+        </div>
+        <div class="provider-panel" id="prov-openai">
+          <div class="field"><label>API key</label><div class="key-wrap"><input type="password" value="sk-proj-xxxxxxxxxxxxxxxxxxxx"><span class="eye" onclick="toggleKey(this)">👁</span></div></div>
+          <div class="field"><label>Model name</label><input type="text" value="gpt-4.1"></div>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-sm" id="test-conn-btn" onclick="testConnection()">Test connection</button>
+          <button class="btn btn-primary btn-sm" onclick="toast('Settings saved.')">Save settings</button>
+        </div>
+      </div>
+
+      <div class="card settings-card danger-zone">
+        <h3>Danger zone</h3>
+        <p class="desc">Archiving hides this project from the main list. Deleting is permanent.</p>
+        <div class="editor-actions" style="justify-content:flex-start;">
+          <button class="btn btn-sm" onclick="toast('Project archived.')">Archive project</button>
+          <button class="btn btn-sm btn-danger-ghost" onclick="toast('Deletion requires typing the project name to confirm.')">Delete project</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   NAV
+============================================================ */
+function goHome(){
+  document.getElementById('screen-welcome').classList.add('active');
+  document.getElementById('screen-project').classList.remove('active');
+  document.getElementById('crumbs').innerHTML = '<span>Projects</span>';
+}
+function openProject(){
+  document.getElementById('screen-welcome').classList.remove('active');
+  document.getElementById('screen-project').classList.add('active');
+  document.getElementById('crumbs').innerHTML = '<span style="cursor:pointer" onclick="goHome()">Projects</span><span>›</span><span class="cur">Bipolar Disorder Support Bot</span>';
+  if(!pipelineInitialized){ initPipeline(); pipelineInitialized = true; }
+}
+function showTab(name){
+  document.querySelectorAll('.proj-subnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>{ t.className=''; }, 2400);
+}
+
+/* ============================================================
+   PIPELINE — functional node editor
+============================================================ */
+const AGENT_DEFS = {
+  static_filter:  {category:'safety', label:'Static Filter',        sub:'regex',                    prompt:null},
+  simple_filter:  {category:'safety', label:'Simple Safety Filter', sub:'cosine similarity',         prompt:null},
+  llm_filter:     {category:'safety', label:'LLM Safety Filter',    sub:'optional escalation',       prompt:'safety'},
+  choice_agent:   {category:'answer', label:'Choice Agent',         sub:'routes best branch',        prompt:'choice'},
+  coding_agent:   {category:'answer', label:'Coding Agent',         sub:'executes computed answers', prompt:null},
+  retrieval_agent:{category:'answer', label:'Retrieval Agent',      sub:'semantic · FAISS',           prompt:'retrieval'},
+  keyword_agent:  {category:'answer', label:'Keyword Retrieval Agent', sub:'BM25',                   prompt:'keyword'},
+};
+const PROMPT_TAB_LABEL = {choice:'Choice Agent', retrieval:'Retrieval Agent', keyword:'Keyword Retrieval Agent', safety:'LLM Safety Filter'};
+
+const BARRIER = {x:340, y:30, w:200, h:340};
+let nodeSeq = 1;
+let nodes = {};      // id -> node object {id,kind,category,label,sub,x,y,w,h,shape,icon,locked}
+let edges = [];      // {id, from, to, cls:'e-solid'|'e-dark'|'e-dashed'|'e-loop', label, deletable}
+let barrierStack = [];
+let selectedId = null;
+let pipelineInitialized = false;
+
+function mkNode(id, opts){
+  nodes[id] = Object.assign({id, x:0, y:0, w:160, h:56, shape:'rect', locked:false}, opts);
+  return nodes[id];
+}
+
+function initPipeline(){
+  nodes = {}; edges = []; barrierStack = []; selectedId = null; nodeSeq = 1;
+
+  mkNode('query',    {label:'User Query',       sub:'', shape:'round', w:64,h:64, x:20,  y:168, icon:'ic-teal', locked:true});
+  mkNode('relevance',{label:'Relevance Check',  sub:'on-topic?', shape:'rect', w:160,h:56, x:140, y:172, icon:'ic-purple', locked:true});
+  mkNode('rejected', {label:'Rejected',         sub:'', shape:'rect', w:110,h:40, x:150, y:340, icon:'ic-rose', locked:true});
+  mkNode('decide',   {label:'Decide Agent',     sub:'', shape:'round', w:64,h:64, x:600, y:168, icon:'ic-ink', locked:true});
+  mkNode('check',    {label:'Check Sufficient', sub:'', shape:'round', w:64,h:64, x:1160,y:168, icon:'ic-ink', locked:true});
+  mkNode('final',    {label:'Final Answer',     sub:'', shape:'round', w:64,h:64, x:1300,y:168, icon:'ic-teal', locked:true});
+
+  edges.push({id:'e_qr', from:'query', to:'relevance', cls:'e-solid', deletable:false});
+  edges.push({id:'e_rj', from:'relevance', to:'rejected', cls:'e-dashed', deletable:false});
+  edges.push({id:'e_cf', from:'check', to:'final', cls:'e-solid', deletable:false});
+  edges.push({id:'e_loop', from:'check', to:'decide', cls:'e-loop', label:'insufficient · loop ≤4', deletable:false});
+
+  relayoutBarrier();
+  render();
+}
+
+function resetPipeline(){
+  initPipeline();
+  toast('Canvas reset to blank skeleton.');
+}
+
+function relayoutBarrier(){
+  edges = edges.filter(e=>e.cls!=='barrier-auto');
+  barrierStack.forEach((id,i)=>{
+    const n = nodes[id];
+    n.x = BARRIER.x + 15;
+    n.y = BARRIER.y + 20 + i*74;
+  });
+  let chain = ['relevance', ...barrierStack, 'decide'];
+  for(let i=0;i<chain.length-1;i++){
+    edges.push({id:'ba_'+i, from:chain[i], to:chain[i+1], cls:'e-solid barrier-auto-line', styleClass:'barrier-auto', deletable:false, _tag:'barrier-auto'});
+  }
+  // mark class properly (avoid confusion with filter above which checks cls!=='barrier-auto')
+  edges.forEach(e=>{ if(e._tag==='barrier-auto'){ e.cls='e-solid'; e.cls='barrier-auto'; }});
+}
+// fix: give barrier auto edges a real renderable class
+function fixBarrierEdgeClasses(){
+  edges.forEach(e=>{ if(e.cls==='barrier-auto'){ e.renderCls='e-solid'; } });
+}
+
+function onChipDragStart(ev){
+  ev.dataTransfer.setData('text/plain', ev.target.closest('.block-chip').dataset.kind);
+}
+
+const canvasWrap = null; // set on init via getElementById lazily
+
+function setupCanvasDnD(){
+  const wrap = document.getElementById('canvas-wrap');
+  const canvas = document.getElementById('canvas');
+  wrap.addEventListener('dragover', e=>{ e.preventDefault(); canvas.classList.add('drop-hover'); });
+  wrap.addEventListener('dragleave', ()=>{ canvas.classList.remove('drop-hover'); });
+  wrap.addEventListener('drop', e=>{
+    e.preventDefault();
+    canvas.classList.remove('drop-hover');
+    const kind = e.dataTransfer.getData('text/plain');
+    const def = AGENT_DEFS[kind];
+    if(!def) return;
+    const rect = canvas.getBoundingClientRect();
+    const dropX = Math.max(0, Math.min(1300, e.clientX - rect.left - 80));
+    const dropY = Math.max(0, Math.min(390, e.clientY - rect.top - 27));
+    const id = 'n'+(nodeSeq++);
+    if(def.category === 'safety'){
+      mkNode(id, {kind, category:'safety', label:def.label, sub:def.sub, shape:'rect', w:170,h:56, icon:'ic-purple'});
+      barrierStack.push(id);
+      relayoutBarrier();
+      toast(def.label+' added to the safety barrier.');
+    } else {
+      mkNode(id, {kind, category:'answer', label:def.label, sub:def.sub, shape:'rect', w:170,h:56, x:dropX, y:dropY, icon:'ic-ink'});
+      toast(def.label+' added — drag from its right-hand dot to connect it.');
+    }
+    render();
+  });
+}
+
+function render(){
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '';
+  // barrier zone box
+  const bz = document.createElement('div');
+  bz.className = 'barrier-zone';
+  bz.style.left = BARRIER.x+'px'; bz.style.top = BARRIER.y+'px'; bz.style.width = BARRIER.w+'px'; bz.style.height = BARRIER.h+'px';
+  bz.innerHTML = '<div class="barrier-label">Safety Barrier</div>' + (barrierStack.length===0 ? '<div class="barrier-empty-hint">Drop a safety agent here</div>' : '');
+  canvas.appendChild(bz);
+
+  Object.values(nodes).forEach(n=>{
+    const el = document.createElement('div');
+    el.className = 'fnode ' + (n.shape==='round' ? 'round' : '') + (n.id===selectedId ? ' selected' : '');
+    el.id = 'node-'+n.id;
+    el.style.left = n.x+'px'; el.style.top = n.y+'px'; el.style.width = n.w+'px'; el.style.height = n.h+'px';
+    const iconSvg = iconFor(n);
+    if(n.shape==='round'){
+      el.innerHTML = `<div class="n-ic ${n.icon}">${iconSvg}</div><div class="n-title">${n.label}</div>`;
+    } else {
+      el.innerHTML = `<div class="n-top"><div class="n-ic ${n.icon}">${iconSvg}</div><div><div class="n-title">${n.label}</div><div class="n-sub">${n.sub||''}</div></div></div>`;
+    }
+    if(!n.locked){
+      const closeBtn = document.createElement('div');
+      closeBtn.className = 'close-btn'; closeBtn.textContent='✕';
+      closeBtn.onclick = (ev)=>{ ev.stopPropagation(); deleteNode(n.id); };
+      el.appendChild(closeBtn);
+    }
+    const outPort = document.createElement('div');
+    outPort.className = 'port out';
+    outPort.onmousedown = (ev)=>startConnect(ev, n.id);
+    el.appendChild(outPort);
+    if(n.id !== 'query'){
+      const inPort = document.createElement('div');
+      inPort.className = 'port in';
+      el.appendChild(inPort);
+    }
+    el.onmousedown = (ev)=>{ if(ev.target.classList.contains('port')) return; startDrag(ev, n.id); };
+    canvas.appendChild(el);
+  });
+
+  redrawEdges();
+  updateInspector();
+}
+
+function iconFor(n){
+  const map = {
+    query:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    relevance:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+    rejected:'<path d="M18 6L6 18M6 6l12 12"/>',
+    decide:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+    check:'<path d="M20 6L9 17l-5-5"/>',
+    final:'<path d="M20 6L9 17l-5-5"/>',
+  };
+  if(map[n.id]) return `<svg class="icon" style="width:14px;height:14px;stroke:#fff" viewBox="0 0 24 24">${map[n.id]}</svg>`;
+  if(n.category==='safety') return '<svg class="icon" style="stroke:#fff" viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg>';
+  if(n.kind==='choice_agent' || n.kind==='coding_agent') return '<svg class="icon" style="stroke:#fff" viewBox="0 0 24 24"><path d="M9 18l6-12M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>';
+  return '<svg class="icon" style="stroke:#fff" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
+}
+
+function portPoint(nodeId, side){
+  const n = nodes[nodeId];
+  return side==='out' ? {x:n.x+n.w, y:n.y+n.h/2} : {x:n.x, y:n.y+n.h/2};
+}
+function bezierPath(p1,p2){
+  const dx = Math.max(40, Math.abs(p2.x-p1.x)*0.5);
+  return `M ${p1.x} ${p1.y} C ${p1.x+dx} ${p1.y}, ${p2.x-dx} ${p2.y}, ${p2.x} ${p2.y}`;
+}
+
+function redrawEdges(){
+  const svg = document.getElementById('edge-svg');
+  svg.innerHTML = '';
+  const allEdges = [...edges];
+  allEdges.forEach(e=>{
+    if(!nodes[e.from] || !nodes[e.to]) return;
+    const p1 = portPoint(e.from,'out');
+    const p2 = portPoint(e.to,'in');
+    const d = bezierPath(p1,p2);
+    const cls = e.cls==='barrier-auto' ? 'e-solid' : e.cls;
+
+    const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+    hit.setAttribute('d', d); hit.setAttribute('class','e-hit');
+    svg.appendChild(hit);
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d); path.setAttribute('class', cls);
+    svg.appendChild(path);
+
+    if(e.label){
+      const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2 - 8;
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', mx); txt.setAttribute('y', my); txt.setAttribute('class','e-label'); txt.setAttribute('text-anchor','middle');
+      txt.textContent = e.label;
+      svg.appendChild(txt);
+    }
+    if(e.deletable){
+      const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class','e-del');
+      g.onclick = ()=>{ edges = edges.filter(x=>x.id!==e.id); redrawEdges(); };
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',mx); c.setAttribute('cy',my); c.setAttribute('r',8);
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',mx); t.setAttribute('y',my+3); t.setAttribute('text-anchor','middle'); t.textContent='×';
+      g.appendChild(c); g.appendChild(t);
+      svg.appendChild(g);
+    }
+  });
+}
+
+function startDrag(ev, id){
+  ev.preventDefault();
+  selectNode(id);
+  const n = nodes[id];
+  if(n.locked && n.category===undefined && !['relevance'].includes(id)){ /* system anchors still draggable below */ }
+  const startX = ev.clientX, startY = ev.clientY;
+  const origX = n.x, origY = n.y;
+  const el = document.getElementById('node-'+id);
+  function onMove(e2){
+    n.x = Math.max(0, origX + (e2.clientX-startX));
+    n.y = Math.max(0, origY + (e2.clientY-startY));
+    el.style.left = n.x+'px'; el.style.top = n.y+'px';
+    redrawEdges();
+  }
+  function onUp(){
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function startConnect(ev, fromId){
+  ev.stopPropagation(); ev.preventDefault();
+  const svg = document.getElementById('edge-svg');
+  const temp = document.createElementNS('http://www.w3.org/2000/svg','path');
+  temp.setAttribute('id','temp-edge');
+  svg.appendChild(temp);
+  const canvas = document.getElementById('canvas');
+  function onMove(e2){
+    const rect = canvas.getBoundingClientRect();
+    const p1 = portPoint(fromId,'out');
+    const p2 = {x:e2.clientX-rect.left, y:e2.clientY-rect.top};
+    temp.setAttribute('d', bezierPath(p1,p2));
+  }
+  function onUp(e2){
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    temp.remove();
+    const targetEl = document.elementFromPoint(e2.clientX, e2.clientY);
+    const targetNodeEl = targetEl && targetEl.closest('.fnode');
+    if(targetNodeEl){
+      const toId = targetNodeEl.id.replace('node-','');
+      if(toId !== fromId){
+        const exists = edges.some(x=>x.from===fromId && x.to===toId);
+        if(!exists){
+          edges.push({id:'m'+(nodeSeq++), from:fromId, to:toId, cls:'e-solid', deletable:true});
+          toast('Connected '+nodes[fromId].label+' → '+nodes[toId].label);
+        }
+      }
+    }
+    redrawEdges();
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function selectNode(id){
+  selectedId = id;
+  document.querySelectorAll('.fnode').forEach(el=>el.classList.remove('selected'));
+  const el = document.getElementById('node-'+id);
+  if(el) el.classList.add('selected');
+  updateInspector();
+}
+function updateInspector(){
+  const insp = document.getElementById('inspector');
+  if(!selectedId || !nodes[selectedId]){ insp.classList.remove('show'); return; }
+  const n = nodes[selectedId];
+  insp.classList.add('show');
+  document.getElementById('ni-title').textContent = n.label;
+  document.getElementById('ni-sub').textContent = n.sub || (n.locked ? 'Fixed pipeline anchor' : n.category+' agent');
+  const def = n.kind ? AGENT_DEFS[n.kind] : null;
+  const editBtn = document.getElementById('ni-edit-prompt');
+  if(def && def.prompt){ editBtn.style.display='block'; editBtn.dataset.prompt = def.prompt; }
+  else { editBtn.style.display='none'; }
+  document.getElementById('ni-delete').style.display = n.locked ? 'none' : 'block';
+}
+function jumpToPrompt(){
+  const pid = document.getElementById('ni-edit-prompt').dataset.prompt;
+  showTab('prompts');
+  const item = document.querySelector('.prompt-item[data-p="'+pid+'"]');
+  if(item) showPrompt(item, pid);
+}
+function deleteSelectedNode(){ if(selectedId) deleteNode(selectedId); }
+function deleteNode(id){
+  const n = nodes[id];
+  if(!n || n.locked) return;
+  delete nodes[id];
+  edges = edges.filter(e=>e.from!==id && e.to!==id);
+  const bi = barrierStack.indexOf(id);
+  if(bi>-1){ barrierStack.splice(bi,1); relayoutBarrier(); }
+  if(selectedId===id) selectedId = null;
+  render();
+  toast('Block removed.');
+}
+
+document.addEventListener('keydown', (e)=>{
+  if((e.key==='Delete'||e.key==='Backspace') && selectedId){
+    const tag = document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') return;
+    deleteSelectedNode();
+  }
+});
+
+/* ============================================================
+   PROMPTS
+============================================================ */
+const promptOriginals = {};
+function showPrompt(el, name){
+  document.querySelectorAll('.prompt-item').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  ['choice','retrieval','keyword','final','safety'].forEach(n=>{
+    document.getElementById('prompt-'+n).style.display = (n===name)?'block':'none';
+  });
+}
+function insertVar(id, v){
+  const ta = document.getElementById('ta-'+id);
+  const pos = ta.selectionStart || ta.value.length;
+  ta.value = ta.value.slice(0,pos) + v + ta.value.slice(pos);
+  ta.focus();
+}
+function savePrompt(id){
+  promptOriginals[id] = document.getElementById('ta-'+id).value;
+  toast('Prompt saved.');
+}
+function revertPrompt(id){
+  if(promptOriginals[id]!==undefined){ document.getElementById('ta-'+id).value = promptOriginals[id]; toast('Reverted to last saved version.'); }
+  else toast('No saved version yet.');
+}
+
+/* ============================================================
+   EVALUATION
+============================================================ */
+const REAL_RESULTS = {
+"how important is sleep out of all the things i can do to help myself":{expected_document:"https://www.youtube.com/watch?v=uLEjoMykwh4&t=1s",expected_answer:"Sleep plays a central role in bipolar disorder management. Healthy sleep patterns help regulate your body's internal clock, and disruptions in sleep can affect mood, energy, and daily functioning.",system_answer:"Sleep sits right at the top of the list when it comes to managing bipolar disorder. Sleep changes are often the earliest warning sign, poor sleep can trigger episodes, and bipolar disorder is closely tied to circadian rhythms.",retrieved_document:"https://www.bphope.com/bipolar-buzz/10-ways-to-clear-the-clutter-and-remove-bipolar-stress/",match:false,cos:0.628,elapsed:22.8},
+"how consistent do i have to be with my sleep schedule":{expected_document:"https://www.youtube.com/watch?v=7P-BWUy8tmY",expected_answer:"Maintaining a consistent sleep and wake schedule is one of the most important self-management strategies for bipolar disorder. Regular daily routines help support your body's biological rhythms and may contribute to mood stability.",system_answer:"As consistent as you can reasonably manage, especially around wake time. People with bipolar disorder tend to have circadian rhythms that are naturally more prone to going out of sync — regular sleep and wake times help keep that steady.",retrieved_document:"https://www.youtube.com/watch?v=1A4RbhH1jTg",match:true,cos:0.744,elapsed:46.0},
+"How can I get to sleep when it is difficult?":{expected_document:"https://www.youtube.com/watch?v=Dd2DRxurLVQ",expected_answer:"Creating a regular daily routine and maintaining consistent sleep habits may help improve sleep. Practical strategies such as establishing a bedtime routine and reducing disruptions before bed can support better sleep.",system_answer:"Sleep can be really challenging with bipolar disorder. Wind down before bed, watch what you eat and drink in the evening, keep a consistent routine, and track your sleep patterns.",retrieved_document:"https://polarus.app/wp-content/uploads/2022/05/Worksheet-Identity-Strategy-1_-Develop-identity-beyond-BD-editable.pdf",match:false,cos:0.578,elapsed:42.4},
+"ways to fall asleep fast":{expected_document:"https://www.crestbd.ca/2020/05/07/8-tips-sleep/",expected_answer:"Good sleep hygiene practices may help you fall asleep more easily. Strategies include keeping a regular sleep schedule, creating a comfortable sleep environment, and avoiding activities that interfere with sleep before bedtime.",system_answer:"Set up good sleep habits (consistent schedule, avoid napping/caffeine), create a sleep-friendly environment, and wind down your mind and body with breathing exercises or a warm bath.",retrieved_document:"https://positivepsychology.com/life-worth-living-setting-life-goals/",match:true,cos:0.585,elapsed:43.4},
+"I understand that travel affects bp hwo to manage":{expected_document:"https://www.youtube.com/watch?v=5JxChcq9SWQ&ab_channel=CRESTBipolarDisorderNetwork",expected_answer:"Travel, especially across time zones, can disrupt your internal clock and sleep schedule. Planning ahead, gradually adjusting your routine, and prioritizing consistent sleep habits may help reduce the impact of travel on mood and well-being.",system_answer:"Crossing time zones disrupts your circadian rhythm, and people with bipolar disorder are especially sensitive to these disruptions. Protect your sleep, watch activity levels, and keep your routine as stable as possible while travelling.",retrieved_document:"https://www.bphope.com/accepting-the-diagnosis/",match:true,cos:0.389,elapsed:44.0},
+"Should I exercise every single day?":{expected_document:"https://www.crestbd.ca/2019/09/05/exercise-as-treatment/",expected_answer:"Regular physical activity can support mental and physical health. The most effective approach is often finding a sustainable routine that fits your needs and abilities rather than focusing solely on exercising every day.",system_answer:"No, you don't need to exercise every single day. Consistency matters more than daily intensity, rest days are okay, and 'some is better than none' is a great guiding principle.",retrieved_document:"https://exerciseanddepression.ca/",match:false,cos:0.572,elapsed:43.9},
+"What’s the best type of exercise for bipolar disorder":{expected_document:"https://www.youtube.com/watch?v=pqILKo3YQg8",expected_answer:"There is no single best form of exercise for everyone. Activities that you enjoy and can maintain consistently may be most beneficial. Different forms of movement can contribute to overall well-being and self-management.",system_answer:"Regular, moderate exercise tends to be the most beneficial and safest approach. Moderate, rhythmic exercise has a calming, mood-stabilizing effect; both aerobic and resistance training offer benefits.",retrieved_document:"https://www.cci.health.wa.gov.au/~/media/CCI/Consumer-Modules/Keeping-Your-Balance/Keeping-Your-Balance---07---Behavioural-Strategies-for-Preventing-Mania.pdf",match:true,cos:0.493,elapsed:42.6},
+"how can i exercise when I struggle to get off the couch?":{expected_document:"https://docs.google.com/document/d/1953bXRmCpDRIZs0_eIROQMKffAMTcYGrU5gofy188NU/edit?tab=t.0",expected_answer:"Starting with small, realistic goals can make physical activity feel more manageable. Tracking progress and focusing on achievable steps may help build momentum over time.",system_answer:"You're not alone in this — low energy is a genuine symptom, not a personal failure. Start tiny (even 5 minutes counts), try a short walk outside, and focus on rhythmic, low-key movement.",retrieved_document:"https://www.apartmenttherapy.com/ways-keep-clean-home-depression-37253461",match:false,cos:0.320,elapsed:46.4},
+"Is there a link between bipolar and disordered eating?":{expected_document:"https://www.crestbd.ca/2022/09/28/binge-eating-bipolar/",expected_answer:"Some people with bipolar disorder also experience challenges related to eating behaviors. Personal experiences and research suggest that eating disorders and bipolar disorder can co-occur, and understanding this connection may be helpful when seeking support.",system_answer:"Yes, there does appear to be a real connection. Mood episodes can affect appetite and eating behaviours, there's a real food-mood connection, and lived experience confirms this overlap.",retrieved_document:"https://www.isbd.org/Files/Admin/Cognition-Booklet.pdf",match:true,cos:0.703,elapsed:43.5},
+"What foods should I eat to promote well-being ?":{expected_document:"https://www.youtube.com/watch?v=GmzkBzEyXPQ&list=PLcAQw63gQMsuS4fjOzrx9_ydLvv9bcC3W&index=20&ab_channel=CRESTBipolarDisorderNetwork",expected_answer:"A balanced and nutritious diet can support overall well-being. Focusing on healthy eating habits and incorporating nutrient-rich foods into your routine may contribute to physical and mental health.",system_answer:"Focus on omega-3s, iron-rich foods, and flavonoid-rich foods; limit trans fats and processed foods. Overall, a balanced, heart-healthy diet that supports a healthy weight is the goal.",retrieved_document:"https://www.isbd.org/Files/Admin/Cognition-Booklet.pdf",match:true,cos:0.481,elapsed:36.9},
+};
+
+let usingBundledDemo = true;
+let uploadedDataset = null;
+let lastResults = [];
+let showAll = false;
+
+function showDataset(el, name){
+  el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.dataset-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('ds-'+name).classList.add('active');
+  updateDatasetNote(name);
+}
+function updateDatasetNote(mode){
+  const note = document.getElementById('dataset-note');
+  if(mode==='manual'){
+    usingBundledDemo = false;
+    note.textContent = 'Using manual entry rows below.';
+  } else {
+    note.textContent = uploadedDataset ? ('Using uploaded file: '+uploadedDataset.name+' ('+uploadedDataset.rows.length+' rows)') : 'Using demo dataset: chatbot_qa_pairs_2026-06-06.csv (10 rows)';
+  }
+}
+function addManualRow(){
+  const tbody = document.getElementById('manual-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td><input placeholder="Type a question…"></td><td><input placeholder="Expected answer…"></td><td><input placeholder="Expected doc URL…"></td><td><span class="row-del" onclick="removeManualRow(this)">✕</span></td>';
+  tbody.appendChild(tr);
+}
+function removeManualRow(el){
+  el.closest('tr').remove();
+}
+
+function hashStr(s){
+  let h = 0;
+  for(let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) >>> 0; }
+  return h;
+}
+function parseCsv(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
+  if(!lines.length) return {header:[], rows:[]};
+  const splitLine = (line)=>{
+    const out=[]; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(c==='"'){ inQ=!inQ; continue; }
+      if(c===',' && !inQ){ out.push(cur); cur=''; continue; }
+      cur+=c;
+    }
+    out.push(cur);
+    return out;
+  };
+  const header = splitLine(lines[0]).map(h=>h.trim().toLowerCase());
+  const rows = lines.slice(1).map(l=>splitLine(l));
+  return {header, rows};
+}
+function onCsvSelected(ev){
+  const file = ev.target.files[0];
+  if(file) loadCsvFile(file);
+}
+function onCsvDrop(ev){
+  ev.preventDefault();
+  const file = ev.dataTransfer.files[0];
+  if(file) loadCsvFile(file);
+}
+function loadCsvFile(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const {header, rows} = parseCsv(reader.result);
+    const qi = header.findIndex(h=>h.includes('question'));
+    const ai = header.findIndex(h=>h.includes('expected_answer')||h.includes('expected answer'));
+    const di = header.findIndex(h=>h.includes('expected_document')||h.includes('expected document'));
+    const dataset = rows.map(r=>({
+      question: qi>-1 ? (r[qi]||'').trim() : '',
+      expected_answer: ai>-1 ? (r[ai]||'').trim() : '',
+      expected_document: di>-1 ? (r[di]||'').trim() : '',
+    })).filter(r=>r.question);
+    uploadedDataset = {name:file.name, rows:dataset};
+    document.getElementById('file-chip').style.display='flex';
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-sub').textContent = dataset.length+' rows loaded · columns detected: '+header.join(', ');
+    usingBundledDemo = (file.name === 'chatbot_qa_pairs_2026-06-06.csv');
+    updateDatasetNote('upload');
+    toast('Loaded '+dataset.length+' rows from '+file.name);
+  };
+  reader.readAsText(file);
+}
+
+function getActiveDataset(){
+  const manualActive = document.getElementById('ds-manual').classList.contains('active');
+  if(manualActive){
+    usingBundledDemo = false;
+    return Array.from(document.querySelectorAll('#manual-tbody tr')).map(tr=>{
+      const inputs = tr.querySelectorAll('input');
+      return {question:inputs[0].value.trim(), expected_answer:inputs[1].value.trim(), expected_document:inputs[2].value.trim()};
+    }).filter(r=>r.question);
+  }
+  if(uploadedDataset) return uploadedDataset.rows;
+  usingBundledDemo = true;
+  return Object.keys(REAL_RESULTS).map(q=>({question:q, expected_answer:REAL_RESULTS[q].expected_answer, expected_document:REAL_RESULTS[q].expected_document}));
+}
+
+function computeRow(row){
+  if(usingBundledDemo && REAL_RESULTS[row.question]){
+    const r = REAL_RESULTS[row.question];
+    return {question:row.question, expected_answer:r.expected_answer, expected_document:r.expected_document,
+      system_answer:r.system_answer, retrieved_document:r.retrieved_document, match:r.match, cos:r.cos, elapsed:r.elapsed};
+  }
+  const h = hashStr(row.question + '|' + row.expected_answer);
+  const cos = +(0.30 + (h % 1000)/1000 * 0.55).toFixed(3);
+  const match = (h % 3 === 0);
+  const elapsed = +(20 + (h % 30) + (h%7)/10).toFixed(1);
+  const distractors = ['https://example.org/related-resource-'+(h%37), 'https://example.org/self-management-guide-'+(h%19), 'https://example.org/faq-'+(h%53)];
+  const system_answer = row.expected_answer
+    ? 'Simulated pipeline answer synthesized from retrieved context, paraphrasing: "'+row.expected_answer.slice(0,110)+(row.expected_answer.length>110?'…':'')+'"'
+    : 'Simulated pipeline answer generated from retrieved context (no reference answer supplied for comparison).';
+  return {question:row.question, expected_answer:row.expected_answer, expected_document:row.expected_document,
+    system_answer, retrieved_document: match ? (row.expected_document||distractors[h%3]) : distractors[h%3], match, cos, elapsed};
+}
+
+function domainOf(url){
+  try{ return new URL(url).hostname.replace('www.',''); }catch(e){ return (url||'').slice(0,28); }
+}
+
+function runEval(){
+  const dataset = getActiveDataset();
+  if(!dataset.length){ toast('Add at least one question before running an evaluation.'); return; }
+  lastResults = dataset.map(computeRow);
+  showAll = false;
+  renderResults();
+  document.getElementById('eval-results').classList.add('show');
+  document.getElementById('eval-results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderResults(){
+  const n = lastResults.length;
+  const matches = lastResults.filter(r=>r.match).length;
+  const avgCos = lastResults.reduce((s,r)=>s+r.cos,0)/n;
+  const avgTime = lastResults.reduce((s,r)=>s+r.elapsed,0)/n;
+
+  document.getElementById('results-title').textContent = 'Results — '+n+' question'+(n===1?'':'s');
+  document.getElementById('results-sub').textContent = usingBundledDemo ? 'Model: Anthropic · claude-sonnet-4-5' : 'Model: Anthropic · claude-sonnet-4-5 (simulated scoring — connect a real model to replace)';
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card good"><div class="num">${Math.round(matches/n*100)}%</div><div class="lbl">Document match rate</div></div>
+    <div class="stat-card"><div class="num">${avgCos.toFixed(2)}</div><div class="lbl">Avg. answer similarity (cosine)</div></div>
+    <div class="stat-card"><div class="num">${avgTime.toFixed(1)}s</div><div class="lbl">Avg. response time</div></div>
+    <div class="stat-card good"><div class="num">${n}/${n}</div><div class="lbl">Completed without error</div></div>
+  `;
+
+  const rowsToShow = showAll ? lastResults : lastResults.slice(0,5);
+  document.getElementById('compare-tbody').innerHTML = rowsToShow.map(r=>`
+    <tr>
+      <td class="q">${escapeHtml(r.question)}</td>
+      <td class="txt"><div class="clamp">${escapeHtml(r.expected_answer||'—')}</div></td>
+      <td class="txt"><div class="clamp">${escapeHtml(r.system_answer)}</div><div class="sim-bar-wrap"><div class="sim-bar" style="width:${Math.round(r.cos*100)}%"></div></div></td>
+      <td><span class="link-pill" title="${escapeHtml(r.expected_document||'')}">${escapeHtml(domainOf(r.expected_document))}</span></td>
+      <td><span class="link-pill" title="${escapeHtml(r.retrieved_document||'')}">${escapeHtml(domainOf(r.retrieved_document))}</span></td>
+      <td>${r.match ? '<span class="badge ok">✓ match</span>' : '<span class="badge no">✗ not found</span>'}</td>
+    </tr>
+  `).join('');
+
+  const btn = document.getElementById('show-all-btn');
+  btn.style.display = n>5 ? 'inline-flex' : 'none';
+  btn.textContent = showAll ? 'Show fewer rows' : 'Show all '+n+' rows';
+}
+function toggleShowAll(){ showAll = !showAll; renderResults(); }
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============================================================
+   SETTINGS
+============================================================ */
+function showProvider(el, name){
+  el.parentElement.querySelectorAll('.provider-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.provider-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('prov-'+name).classList.add('active');
+}
+function toggleKey(el){
+  const input = el.previousElementSibling;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+function testConnection(){
+  const btn = document.getElementById('test-conn-btn');
+  btn.disabled = true; btn.textContent = 'Testing…';
+  setTimeout(()=>{ btn.disabled=false; btn.textContent='Test connection'; toast('Connected successfully.'); }, 700);
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+setupCanvasDnD();
+updateDatasetNote('upload');
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{
+  "config": {
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  },
+  "entrypoint": "safety_screen",
+  "max_steps": 25,
+  "nodes": {
+    "safety_screen": {
+      "type": "Static_Barrier_Agent",
+      "prev": -1,
+      "routes": {
+        "safe": "decision",
+        "reject": "decline",
+        "escalate": "judge",
+        "escalate_judge": "judge"
+      }
+    },
+    "judge": {
+      "type": "Judge_Barrier_Agent",
+      "prev": "safety_screen",
+      "routes": {
+        "harmful": "decline",
+        "safe": "decision"
+      }
+    },
+    "decision": {
+      "type": "Decision_Agent",
+      "prev": ["safety_screen", "judge"],
+      "query": "Given the user's message, choose whether a broad statistical search ('semantic') or a combined keyword-and-statistical search ('hybrid') will better retrieve the relevant guideline passages. Prefer 'hybrid' when the message names a specific drug or dose; prefer 'semantic' for broader symptom questions.",
+      "options": ["semantic", "hybrid"],
+      "semantic": "rag_1",
+      "hybrid": "hybrid_1"
+    },
+    "rag_1": {
+      "type": "RAG_Agent",
+      "prev": "decision",
+      "query": 0,
+      "corpus_address": "backend/pipelines_demo/corpus_clinical",
+      "top_k": 2,
+      "next": "rag_2"
+    },
+    "rag_2": {
+      "type": "RAG_Agent",
+      "prev": "rag_1",
+      "corpus_address": "backend/pipelines_demo/corpus_clinical",
+      "top_k": 2,
+      "next": "answer"
+    },
+    "hybrid_1": {
+      "type": "Hybrid_Agent",
+      "prev": "decision",
+      "query": 0,
+      "corpus_address": "backend/pipelines_demo/corpus_clinical",
+      "top_k": 3,
+      "next": "answer"
+    },
+    "answer": {
+      "type": "Direct_Answer_Agent",
+      "prev": ["rag_2", "hybrid_1"],
+      "next": -1
+    },
+    "decline": {
+      "type": "Static_Agent",
+      "prev": ["safety_screen", "judge"],
+      "message": "I'm here to support you, but I can't help with that request. If you're in crisis, please contact a crisis line or emergency services right away. In Canada: Crisis Services Canada -- 1-833-456-4566 (24/7).",
+      "next": -1
+    }
+  }
+}

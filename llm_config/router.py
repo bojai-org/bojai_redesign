@@ -14,7 +14,7 @@ from typing import Any
 
 from llm_config.openai_llm import OpenAILLM
 from llm_config.ollama_llm import OllamaLLM
-from build.prompt import PromptLeaf
+from backend.prompt import PromptLeaf
 
 
 class Provider(str, Enum):

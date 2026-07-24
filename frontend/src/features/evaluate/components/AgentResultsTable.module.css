@@ -1,0 +1,50 @@
+.wrap {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--ink-700);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.question {
+  max-width: 260px;
+}
+
+.answer {
+  max-width: 260px;
+  color: var(--muted);
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}

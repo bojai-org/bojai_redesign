@@ -1,0 +1,51 @@
+{
+  "config": {
+    "provider": "openai",
+    "model": "gpt-4o-mini"
+  },
+  "entrypoint": "decision",
+  "max_steps": 20,
+  "nodes": {
+    "decision": {
+      "type": "Decision_Agent",
+      "prev": -1,
+      "context": "Choose whether exact keyword search ('keyword') or combined hybrid search ('hybrid') will better retrieve the relevant onboarding docs for the question below. Prefer 'keyword' when the question names an exact tool, file, or process name; prefer 'hybrid' for broader phrasing.",
+      "options": ["keyword", "hybrid"],
+      "keyword": "keyword_1",
+      "hybrid": "hybrid_1"
+    },
+    "keyword_1": {
+      "type": "Keyword_Search_Agent",
+      "prev": "decision",
+      "corpus_address": "backend/pipelines_demo/corpus_engineering",
+      "top_k": 2,
+      "next": "keyword_2"
+    },
+    "keyword_2": {
+      "type": "Keyword_Search_Agent",
+      "prev": "keyword_1",
+      "corpus_address": "backend/pipelines_demo/corpus_engineering",
+      "top_k": 2,
+      "next": "summary"
+    },
+    "hybrid_1": {
+      "type": "Hybrid_Agent",
+      "prev": "decision",
+      "corpus_address": "backend/pipelines_demo/corpus_engineering",
+      "top_k": 2,
+      "next": "hybrid_2"
+    },
+    "hybrid_2": {
+      "type": "Hybrid_Agent",
+      "prev": "hybrid_1",
+      "corpus_address": "backend/pipelines_demo/corpus_engineering",
+      "top_k": 2,
+      "next": "summary"
+    },
+    "summary": {
+      "type": "Simple_Task_Agent",
+      "prev": ["keyword_2", "hybrid_2"],
+      "next": -1
+    }
+  }
+}

@@ -1,0 +1,24 @@
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  user-select: none;
+}
+
+.mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.name {
+  font-weight: 700;
+  font-size: 15.5px;
+  letter-spacing: 0.2px;
+  color: var(--ink);
+}
+
+.name b {
+  color: var(--bj-700);
+}

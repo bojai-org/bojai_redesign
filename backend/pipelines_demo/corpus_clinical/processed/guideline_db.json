@@ -1,0 +1,34 @@
+[
+  {
+    "text": "Lithium is a first-line mood stabilizer for bipolar disorder. Its therapeutic range is typically 0.6-1.2 mmol/L, and regular renal and thyroid function monitoring is required during long-term treatment.",
+    "metadata": {"section": "Pharmacotherapy", "chunk_id": "clin-1", "url": "https://example.org/guidelines/lithium"}
+  },
+  {
+    "text": "Quetiapine dosing for acute mania typically starts at 100mg and titrates upward over several days, commonly reaching 400-800mg per day depending on response and tolerability.",
+    "metadata": {"section": "Pharmacotherapy", "chunk_id": "clin-2", "url": "https://example.org/guidelines/quetiapine"}
+  },
+  {
+    "text": "Patients experiencing manic episodes often report racing thoughts, reduced need for sleep, grandiosity, and increased goal-directed activity that can escalate over days.",
+    "metadata": {"section": "Mania", "chunk_id": "clin-3", "url": "https://example.org/guidelines/mania-signs"}
+  },
+  {
+    "text": "Depressive episodes in bipolar disorder present with anhedonia, hypersomnia or insomnia, low energy, and psychomotor slowing, and can be harder to distinguish from unipolar depression.",
+    "metadata": {"section": "Depression", "chunk_id": "clin-4", "url": "https://example.org/guidelines/depression-signs"}
+  },
+  {
+    "text": "Cognitive behavioral therapy and structured psychoeducation are common adjuncts to pharmacotherapy, helping patients recognize early warning signs of mood episodes.",
+    "metadata": {"section": "Psychotherapy", "chunk_id": "clin-5", "url": "https://example.org/guidelines/psychotherapy"}
+  },
+  {
+    "text": "Consistent sleep and wake times, limiting late caffeine intake, and maintaining a stable daily routine are recommended sleep hygiene practices that support mood stabilization.",
+    "metadata": {"section": "Sleep hygiene", "chunk_id": "clin-6", "url": "https://example.org/guidelines/sleep-hygiene"}
+  },
+  {
+    "text": "Alcohol and recreational drug use can interact with mood stabilizers, reduce medication efficacy, and increase the risk of triggering a manic or depressive episode.",
+    "metadata": {"section": "Substance interactions", "chunk_id": "clin-7", "url": "https://example.org/guidelines/substance-interactions"}
+  },
+  {
+    "text": "Seek emergency care immediately for suicidal ideation with a plan, active psychosis, or severe manic agitation that puts the patient or others at risk.",
+    "metadata": {"section": "Emergency", "chunk_id": "clin-8", "url": "https://example.org/guidelines/emergency-care"}
+  }
+]

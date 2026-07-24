@@ -1,0 +1,34 @@
+[
+  {
+    "text": "The repository is split into backend (the pipeline engine and agents), frontend (the editor UI), and llm_config (provider routing for OpenAI and Ollama).",
+    "metadata": {"section": "Repo structure", "chunk_id": "eng-1", "url": "https://example.org/onboarding/repo-structure"}
+  },
+  {
+    "text": "To set up a local dev environment, create a virtual environment, then install requirements.txt with pip. Python 3.11 or later is required.",
+    "metadata": {"section": "Dev environment", "chunk_id": "eng-2", "url": "https://example.org/onboarding/dev-setup"}
+  },
+  {
+    "text": "Run the backend test suite with pytest from the repository root; pytest.ini sets pythonpath so bare imports like 'import agents' resolve correctly.",
+    "metadata": {"section": "Testing", "chunk_id": "eng-3", "url": "https://example.org/onboarding/testing"}
+  },
+  {
+    "text": "Every pull request needs at least one review and a passing test run before merging; keep PRs focused on a single change so review stays fast.",
+    "metadata": {"section": "Code review", "chunk_id": "eng-4", "url": "https://example.org/onboarding/code-review"}
+  },
+  {
+    "text": "The CI pipeline runs linting, the pytest suite, and a build step on every push; a failing stage blocks merge until it's fixed.",
+    "metadata": {"section": "Deployment", "chunk_id": "eng-5", "url": "https://example.org/onboarding/ci-cd"}
+  },
+  {
+    "text": "On-call engineers respond to paging alerts within fifteen minutes and follow the incident runbook to triage, mitigate, and then write a postmortem.",
+    "metadata": {"section": "On-call", "chunk_id": "eng-6", "url": "https://example.org/onboarding/on-call"}
+  },
+  {
+    "text": "Use snake_case for functions and variables, PascalCase for classes, and keep docstrings to one line unless a non-obvious constraint needs explaining.",
+    "metadata": {"section": "Style guide", "chunk_id": "eng-7", "url": "https://example.org/onboarding/style-guide"}
+  },
+  {
+    "text": "Architecture decision records live under docs/ and capture the reasoning behind major structural choices, such as splitting agents.py from base_classes.py.",
+    "metadata": {"section": "ADRs", "chunk_id": "eng-8", "url": "https://example.org/onboarding/adrs"}
+  }
+]

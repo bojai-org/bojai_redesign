@@ -1,0 +1,66 @@
+.library {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.heading {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.safetyHeading {
+  margin-top: 14px;
+  color: var(--rose);
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--bj-50);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.item:hover {
+  border-color: var(--bj-400);
+  background: var(--bj-100);
+}
+
+.itemDanger {
+  background: var(--rose-100);
+  border-color: var(--rose);
+  color: var(--rose);
+}
+
+.itemDanger:hover {
+  background: var(--rose-100);
+  border-color: var(--rose);
+  filter: brightness(0.95);
+}
+
+.itemDanger .plus {
+  color: var(--rose);
+}
+
+.plus {
+  color: var(--bj-600);
+  font-weight: 700;
+}

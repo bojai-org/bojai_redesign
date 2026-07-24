@@ -1,0 +1,89 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.answers {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-700);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.muted {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rose);
+}
+
+.matchList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.matchList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.matchLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-700);
+  word-break: break-all;
+}
+
+.chunkList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chunkMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.chunkText {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-700);
+  line-height: 1.5;
+}

@@ -6,8 +6,8 @@ from base_classes import Agent, MAX_TRIES
 class DummyAgent(Agent):
     """Minimal concrete Agent for exercising the shared base-class logic."""
 
-    def __init__(self, query="q", context="ctx", role="role", extra: dict | None = None):
-        super().__init__(query, context, role)
+    def __init__(self, query="q", state: dict | None = None, role="role", extra: dict | None = None):
+        super().__init__(query, state, role)
         self.extra = extra or {}
 
     def pre(self) -> dict:
@@ -25,26 +25,49 @@ class DummyAgent(Agent):
         return "fallback"
 
 
-def test_init_stores_query_context_role():
-    agent = DummyAgent(query="q1", context="c1", role="r1")
+def test_init_stores_query_state_role():
+    agent = DummyAgent(query="q1", state={"context": "c1"}, role="r1")
     assert agent.query == "q1"
-    assert agent.context == "c1"
+    assert agent.state == {"context": "c1"}
     assert agent.role == "r1"
 
 
-def test_prompt_config_contains_role_query_context():
-    agent = DummyAgent(query="q1", context="c1", role="r1")
-    assert agent._prompt_config() == {"role": "r1", "query": "q1", "context": "c1"}
+def test_init_defaults_state_to_empty_dict_when_none():
+    agent = DummyAgent(query="q1", role="r1")
+    assert agent.state == {}
+
+
+def test_prompt_config_contains_role_and_query_only():
+    """Shared state is no longer blindly stuffed into every prompt -- only
+    role/query are universal; a namespaced state key only appears in the
+    prompt if an agent's own pre() explicitly puts it there (see below)."""
+    agent = DummyAgent(query="q1", state={"context": "c1"}, role="r1")
+    assert agent._prompt_config() == {"role": "r1", "query": "q1"}
 
 
 def test_build_prompt_includes_pre_and_output_fields():
-    agent = DummyAgent(query="q1", context="c1", role="r1", extra={"resources": "some resources"})
+    agent = DummyAgent(query="q1", role="r1", extra={"resources": "some resources"})
     rendered = agent.build_prompt().render()
     assert "q1" in rendered
-    assert "c1" in rendered
     assert "r1" in rendered
     assert "some resources" in rendered
     assert "plain text" in rendered  # from specify_output()
+
+
+def test_build_prompt_does_not_auto_insert_shared_state():
+    """A raw state value never leaks into the prompt on its own -- an agent
+    that wants it there must return it from pre() explicitly (see below)."""
+    agent = DummyAgent(query="q1", state={"context": "should not leak into the prompt"}, role="r1")
+    rendered = agent.build_prompt().render()
+    assert "should not leak into the prompt" not in rendered
+
+
+def test_build_prompt_includes_state_key_when_pre_inserts_it():
+    """This is "you insert into the prompt context when necessary": pre() reads
+    whatever key(s) of self.state it needs and returns them explicitly."""
+    agent = DummyAgent(query="q1", state={"context": "c1"}, role="r1", extra={"context": "c1"})
+    rendered = agent.build_prompt().render()
+    assert "c1" in rendered
 
 
 def test_build_prompt_skips_name_key():

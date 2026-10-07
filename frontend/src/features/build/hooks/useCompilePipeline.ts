@@ -31,27 +31,68 @@ export interface UseCompilePipelineResult {
    * .../run call) discovers the id is gone server-side with a 404.
    */
   invalidatePipelineId: (reason: string) => void;
+  /** Marks an already-compiled pipeline as the current one (e.g. a run being
+   * opened) without compiling. The caller swaps the graph in at the same
+   * time; that swap is not treated as an edit. */
+  restore: (compiled: RestoredCompile) => void;
+}
+
+export interface RestoredCompile {
+  pipelineId: string;
+  definitionHash: string;
+  summary: PipelineSummary | null;
+}
+
+export interface CompiledResult {
+  summary: PipelineSummary;
+  definitionHash: string;
+  /** The graph and config exactly as they were when this compile started. */
+  nodes: PipelineNode[];
+  edges: PipelineEdge[];
+  runtimeConfig: PipelineRuntimeConfig;
+}
+
+export interface UseCompilePipelineOptions {
+  /** Compiled pipelines are saved under this project on the backend. */
+  projectId: string;
+  /** Where to start, e.g. a project reopened with its active run's pipeline
+   * already compiled. Defaults to INITIAL_COMPILE_STATE. */
+  initialCompileState?: CompileState;
+  /** Pipeline id already compiled from this definition, if any. A definition
+   * with none gets a brand-new pipeline (POST) so other versions keep theirs. */
+  pipelineIdForHash: (definitionHash: string) => string | null;
+  /** Called once per successful compile. */
+  onCompiled: (result: CompiledResult) => void;
 }
 
 /**
  * Owns the Build workspace's compile state machine: tracks dirtiness from
  * graph/config edits, runs local validation, serializes, and talks to
- * backend/app.py -- POST to create, PUT to recompile in place, with a
- * single-retry fallback to POST if a PUT 404s (the stored pipeline vanished
- * server-side, e.g. a backend restart, since there is no persistence layer
- * yet -- see backend/app.py's module docstring).
+ * backend/app.py. Every distinct definition gets its own backend pipeline
+ * (POST); recompiling a definition that already has one updates it in place
+ * (PUT), with a single-retry fallback to POST if that PUT 404s (the stored
+ * pipeline vanished server-side, e.g. a backend restart, since compiled
+ * pipelines aren't persisted -- see backend/app.py's module docstring).
  */
 export function useCompilePipeline(
   nodes: PipelineNode[],
   edges: PipelineEdge[],
   runtimeConfig: PipelineRuntimeConfig,
+  { projectId, initialCompileState = INITIAL_COMPILE_STATE, pipelineIdForHash, onCompiled }: UseCompilePipelineOptions,
 ): UseCompilePipelineResult {
-  const [compileState, setCompileState] = useState<CompileState>(INITIAL_COMPILE_STATE);
+  const [compileState, setCompileState] = useState<CompileState>(initialCompileState);
 
   const isFirstRender = useRef(true);
+  // Set by restore(): the graph swap that accompanies it changes `nodes`, but
+  // isn't an edit, so the dirty effect below must skip it once.
+  const skipNextDirty = useRef(false);
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      return;
+    }
+    if (skipNextDirty.current) {
+      skipNextDirty.current = false;
       return;
     }
     setCompileState((current) =>
@@ -94,18 +135,21 @@ export function useCompilePipeline(
     }
 
     const definition = preview.definition;
-    const targetPipelineId = compileState.pipelineId;
+    const definitionHash = hashPipelineDefinition(definition);
+    const snapshot = { nodes, edges, runtimeConfig };
+    const targetPipelineId = pipelineIdForHash(definitionHash);
     setCompileState((current) => ({ ...current, status: "compiling" }));
 
     const succeed = (summary: PipelineSummary) => {
       setCompileState((current) => ({
         status: "compiled",
         pipelineId: summary.pipeline_id,
-        lastCompiledDefinitionHash: hashPipelineDefinition(definition),
+        lastCompiledDefinitionHash: definitionHash,
         error: null,
         summary,
         successCount: current.successCount + 1,
       }));
+      onCompiled({ summary, definitionHash, ...snapshot });
     };
 
     const fail = (message: string, clearPipelineId = false) => {
@@ -119,15 +163,15 @@ export function useCompilePipeline(
 
     try {
       const summary = targetPipelineId
-        ? await updatePipeline(targetPipelineId, definition)
-        : await compilePipeline(definition);
+        ? await updatePipeline(targetPipelineId, definition, projectId)
+        : await compilePipeline(definition, { projectId });
       succeed(summary);
     } catch (error) {
       if (error instanceof BuildApiError && error.status === 404 && targetPipelineId) {
         // The pipeline id we had is gone server-side -- retry once as a
         // fresh create rather than looping on 404s.
         try {
-          const summary = await compilePipeline(definition);
+          const summary = await compilePipeline(definition, { projectId });
           succeed(summary);
         } catch (retryError) {
           fail(
@@ -155,6 +199,18 @@ export function useCompilePipeline(
     }));
   }
 
+  function restore({ pipelineId, definitionHash, summary }: RestoredCompile): void {
+    skipNextDirty.current = true;
+    setCompileState((current) => ({
+      status: "compiled",
+      pipelineId,
+      lastCompiledDefinitionHash: definitionHash,
+      error: null,
+      summary,
+      successCount: current.successCount,
+    }));
+  }
+
   return {
     compileState,
     validationErrors,
@@ -163,5 +219,6 @@ export function useCompilePipeline(
     compile,
     reset,
     invalidatePipelineId,
+    restore,
   };
 }

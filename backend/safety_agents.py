@@ -45,13 +45,14 @@ class BarrierResult(TypedDict):
     reason: str
     layer: int
     score: float | None
+    # A canned decline message, or None when the barrier isn't blocking. This
+    # is the only key a barrier is allowed to write to shared pipeline state
+    # (see each class's WRITES below and base_classes.Agent's docstring) --
+    # unlike the old context-threading model, a barrier no longer needs to
+    # carry its incoming context back out just to avoid losing it: shared
+    # state already holds whatever a retrieval node wrote there, untouched,
+    # regardless of which way a barrier routes.
     answer: str | None
-    # The barrier's own incoming context, carried through unchanged. Pipeline
-    # routing reads "action" for its route decision (see base_classes' Agent
-    # runtime contract); without this key, Pipeline._resolve_context would
-    # forward str(this_dict) as the next node's context instead of the actual
-    # text a barrier mid-chain was screening.
-    context: str
 
 
 INPUT_DECLINE_MESSAGE = (
@@ -193,12 +194,18 @@ class Static_Barrier_Agent(Agent):
     correctly if invoked directly instead of through run().
     """
 
-    def __init__(self, query: str, context: str = DEFAULT_BARRIER_CONTEXT):
+    WRITES = frozenset({"answer"})
+
+    def __init__(self, query: str, context: str = DEFAULT_BARRIER_CONTEXT, state: dict | None = None):
         role = (
             "You are a deterministic pattern-matching safety screener for a "
             "patient-facing mental health chatbot."
         )
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
+        # A fixed background description of the deployment, not pipeline-flowing
+        # data -- unrelated to the shared `state` dict above, and never touched
+        # by the pipeline runtime after construction.
+        self.context = context
 
     async def run(self, agent_config: dict) -> BarrierResult:
         return self._screen(self.query)
@@ -214,7 +221,6 @@ class Static_Barrier_Agent(Agent):
                     "layer": 1,
                     "score": None,
                     "answer": INPUT_DECLINE_MESSAGE,
-                    "context": self.context,
                 }
 
         for pattern in STATIC_ESCALATE_TO_JUDGE_PATTERNS:
@@ -228,7 +234,6 @@ class Static_Barrier_Agent(Agent):
                     "layer": 1,
                     "score": None,
                     "answer": None,
-                    "context": self.context,
                 }
 
         for pattern in STATIC_ESCALATE_PATTERNS:
@@ -239,7 +244,6 @@ class Static_Barrier_Agent(Agent):
                     "layer": 1,
                     "score": None,
                     "answer": None,
-                    "context": self.context,
                 }
 
         return {
@@ -248,7 +252,6 @@ class Static_Barrier_Agent(Agent):
             "layer": 1,
             "score": None,
             "answer": None,
-            "context": self.context,
         }
 
     def pre(self) -> dict:
@@ -285,6 +288,8 @@ class Neural_Network_Barrier_Agent(Agent):
             ...
     """
 
+    WRITES = frozenset({"answer"})
+
     def __init__(
         self,
         query: str,
@@ -294,12 +299,15 @@ class Neural_Network_Barrier_Agent(Agent):
         harmful_references: list[str] | None = None,
         reject_threshold: float = NN_REJECT_THRESHOLD,
         escalate_threshold: float = NN_ESCALATE_THRESHOLD,
+        state: dict | None = None,
     ):
         role = (
             "You are an embedding-similarity safety classifier for a "
             "patient-facing mental health chatbot."
         )
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
+        # Fixed background description; not pipeline-flowing shared state.
+        self.context = context
 
         if not callable(embed_texts):
             raise TypeError("embed_texts must be callable")
@@ -358,7 +366,6 @@ class Neural_Network_Barrier_Agent(Agent):
                 "layer": 2,
                 "score": None,
                 "answer": None,
-                "context": self.context,
             }
 
     def _validate_embeddings(
@@ -445,7 +452,6 @@ class Neural_Network_Barrier_Agent(Agent):
                 "layer": 2,
                 "score": max_similarity,
                 "answer": INPUT_DECLINE_MESSAGE,
-                "context": self.context,
             }
 
         if max_similarity >= self.escalate_threshold:
@@ -457,7 +463,6 @@ class Neural_Network_Barrier_Agent(Agent):
                 "layer": 2,
                 "score": max_similarity,
                 "answer": None,
-                "context": self.context,
             }
 
         return {
@@ -468,7 +473,6 @@ class Neural_Network_Barrier_Agent(Agent):
             "layer": 2,
             "score": max_similarity,
             "answer": None,
-            "context": self.context,
         }
 
     def post_fallback(self, response: str) -> BarrierResult:
@@ -479,7 +483,6 @@ class Neural_Network_Barrier_Agent(Agent):
             "layer": 2,
             "score": None,
             "answer": None,
-            "context": self.context,
         }
 
 
@@ -495,13 +498,17 @@ class Judge_Barrier_Agent(Agent):
     closed if all retries are exhausted — there is no Layer 4 to escalate to.
     """
 
-    def __init__(self, query: str, context: str = DEFAULT_BARRIER_CONTEXT):
+    WRITES = frozenset({"answer"})
+
+    def __init__(self, query: str, context: str = DEFAULT_BARRIER_CONTEXT, state: dict | None = None):
         role = (
             "You are the final safety judge for a patient-facing bipolar "
             "disorder support chatbot. Decide whether the user's message is "
             "harmful and must be blocked."
         )
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
+        # Fixed background description; not pipeline-flowing shared state.
+        self.context = context
 
     async def run(self, agent_config: dict) -> BarrierResult:
         try:
@@ -516,7 +523,6 @@ class Judge_Barrier_Agent(Agent):
                 "layer": 3,
                 "score": None,
                 "answer": INPUT_DECLINE_MESSAGE,
-                "context": self.context,
             }
 
     def pre(self) -> dict:
@@ -563,7 +569,6 @@ class Judge_Barrier_Agent(Agent):
                 "layer": 3,
                 "score": None,
                 "answer": INPUT_DECLINE_MESSAGE,
-                "context": self.context,
             }
 
         return {
@@ -572,7 +577,6 @@ class Judge_Barrier_Agent(Agent):
             "layer": 3,
             "score": None,
             "answer": None,
-            "context": self.context,
         }
 
     def post_fallback(self, response: str) -> BarrierResult:
@@ -583,7 +587,6 @@ class Judge_Barrier_Agent(Agent):
             "layer": 3,
             "score": None,
             "answer": INPUT_DECLINE_MESSAGE,
-            "context": self.context,
         }
 
 
@@ -599,6 +602,8 @@ class Input_Barrier_Pipeline:
     Agent step with its own run(agent_config).
     """
 
+    WRITES = frozenset({"answer"})
+
     def __init__(
         self,
         query: str,
@@ -607,6 +612,7 @@ class Input_Barrier_Pipeline:
         context: str = DEFAULT_BARRIER_CONTEXT,
         reject_threshold: float = NN_REJECT_THRESHOLD,
         escalate_threshold: float = NN_ESCALATE_THRESHOLD,
+        state: dict | None = None,
     ):
         self.query = query
         self.embedding_config = embedding_config
@@ -614,6 +620,9 @@ class Input_Barrier_Pipeline:
         self.context = context
         self.reject_threshold = reject_threshold
         self.escalate_threshold = escalate_threshold
+        # Uniform with every other agent type so Pipeline.run() can patch it
+        # in each step, even though none of the three layers below read it.
+        self.state: dict = state if state is not None else {}
 
     async def run(self, agent_config: dict) -> BarrierResult:
         layer_1 = Static_Barrier_Agent(query=self.query, context=self.context)

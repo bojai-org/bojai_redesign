@@ -1,6 +1,9 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { EvaluationRun } from "../types/run";
+import { useProjectPersistence } from "../../projects/state/ProjectPersistenceContext";
+import { runMetadataChanged } from "../../projects/state/projectPersistence";
+import type { ProjectPersistence } from "../../projects/state/projectPersistence";
+import type { ChatResponseFeedback, EvaluationRun, RunWorkflow } from "../types/run";
 
 type ViewMode = "run" | "compare";
 
@@ -9,6 +12,14 @@ interface RunsState {
   activeRunId: string | null;
   bestRunId: string | null;
   viewMode: ViewMode;
+  nextRunNumber: number;
+}
+
+/** What a project was saved with -- see ProjectWorkspacePage. */
+export interface InitialRunsState {
+  runs: EvaluationRun[];
+  activeRunId: string | null;
+  bestRunId: string | null;
   nextRunNumber: number;
 }
 
@@ -26,17 +37,28 @@ function newRunId(): string {
     : `run-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function newResponseId(): string {
+  return typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `response-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export interface EvaluationRunsContextValue {
   runs: EvaluationRun[];
   activeRun: EvaluationRun | null;
   bestRunId: string | null;
   viewMode: ViewMode;
-  /** Creates a new run when the given definition hash differs from the most
-   * recent run's (or none exist yet), and makes it active; otherwise just
-   * re-selects the existing run for that hash. Safe to call on every mount --
-   * a no-op call returns the same state reference, so it never forces an
-   * extra render. */
-  ensureRunForPipeline: (pipelineId: string, definitionHash: string) => void;
+  /** Number the next new run's default name ("runN") will use. */
+  nextRunNumber: number;
+  /** Called after every successful compile. Creates a new run (and makes it
+   * active) for a definition hash no run has yet; otherwise re-selects the
+   * existing run for that hash, refreshing its pipeline id (a recompile can
+   * hand back a new one) and workflow snapshot (e.g. moved nodes). */
+  recordCompiledRun: (pipelineId: string, definitionHash: string, workflow: RunWorkflow) => void;
+  /** The pipeline id of the run compiled from this definition, if any -- lets
+   * a recompile of an existing version reuse its pipeline instead of making
+   * another one. */
+  pipelineIdForHash: (definitionHash: string) => string | null;
   selectRun: (runId: string) => void;
   renameRun: (runId: string, name: string) => void;
   updateRun: (runId: string, patch: Partial<EvaluationRun>) => void;
@@ -48,50 +70,122 @@ export interface EvaluationRunsContextValue {
    * before it) becomes active instead; if it was best, best is cleared. */
   deleteRun: (runId: string) => void;
   showCompare: () => void;
+  /** Appends a new chat exchange (from the Run tab) to a run and returns its id,
+   * so the caller can attach feedback to it once the user votes. */
+  addResponse: (runId: string, entry: { query: string; answer: string }) => string;
+  /** Sets or clears the vote/explanation on one chat exchange. */
+  setResponseFeedback: (
+    runId: string,
+    responseId: string,
+    patch: { vote: "up" | "down" | null; explanation: string },
+  ) => void;
 }
 
 const EvaluationRunsContext = createContext<EvaluationRunsContextValue | null>(null);
 
 /**
- * Owns the Evaluate tab's run history for the duration of a project session.
- * Mounted once around the project workspace routes (see ProjectWorkspacePage,
- * alongside PipelineWorkspaceProvider) so it survives navigating away to
- * Build/Run and back -- only a fresh project (a new `key`) resets it.
+ * Saves every change to `runs` through the project's autosave: new or edited
+ * runs, new or edited chat responses, and deleted runs. Works by comparing
+ * each render's runs with the previous ones -- state updates always replace
+ * what they change, so an unchanged run/response keeps its object identity.
+ * Reports aren't saved here: the backend writes them itself when an
+ * evaluation job started for a run finishes.
  */
-export function EvaluationRunsProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<RunsState>(INITIAL_STATE);
+function useAutosaveRuns(runs: EvaluationRun[], persistence: ProjectPersistence): void {
+  const previousRuns = useRef(runs);
 
-  const ensureRunForPipeline = useCallback((pipelineId: string, definitionHash: string) => {
-    setState((current) => {
-      const lastRun = current.runs.length > 0 ? current.runs[current.runs.length - 1] : null;
+  useEffect(() => {
+    const previous = previousRuns.current;
+    previousRuns.current = runs;
+    if (previous === runs) return;
 
-      if (lastRun && lastRun.definitionHash === definitionHash) {
-        if (current.activeRunId === lastRun.id && current.viewMode === "run") return current;
-        return { ...current, activeRunId: lastRun.id, viewMode: "run" };
+    const previousById = new Map(previous.map((run) => [run.id, run]));
+    for (const run of runs) {
+      const before = previousById.get(run.id);
+      previousById.delete(run.id);
+      if (before === run) continue;
+      if (!before || runMetadataChanged(before, run)) void persistence.saveRun(run);
+      if (before?.responses === run.responses) continue;
+
+      const responsesBefore = new Map(before?.responses.map((response) => [response.id, response]));
+      for (const response of run.responses) {
+        if (responsesBefore.get(response.id) !== response) void persistence.saveResponse(run.id, response);
       }
+    }
+    for (const deletedId of previousById.keys()) void persistence.deleteRun(deletedId);
+  }, [runs, persistence]);
+}
 
-      const run: EvaluationRun = {
-        id: newRunId(),
-        name: `run${current.nextRunNumber}`,
-        pipelineId,
-        definitionHash,
-        createdAt: Date.now(),
-        safetyAgentsChecked: false,
-        safetyAgentsInfo: null,
-        safetyAgentsError: null,
-        safetyReport: null,
-        agentReport: null,
-      };
+/**
+ * Owns the project's run history and which run is active, for the duration of
+ * a project session. Mounted once around the project workspace routes (see
+ * ProjectWorkspacePage), outside PipelineWorkspaceProvider so the workspace
+ * can record compiles as runs and load a run's workflow when it's opened --
+ * only a fresh project (a new `key`) resets it.
+ */
+export function EvaluationRunsProvider({
+  initialState,
+  children,
+}: {
+  /** The project's saved runs; omitted for a project with none. */
+  initialState?: InitialRunsState;
+  children: ReactNode;
+}) {
+  const [state, setState] = useState<RunsState>(() =>
+    initialState ? { ...INITIAL_STATE, ...initialState } : INITIAL_STATE,
+  );
+  useAutosaveRuns(state.runs, useProjectPersistence());
 
-      return {
-        ...current,
-        runs: [...current.runs, run],
-        activeRunId: run.id,
-        viewMode: "run",
-        nextRunNumber: current.nextRunNumber + 1,
-      };
-    });
-  }, []);
+  const recordCompiledRun = useCallback(
+    (pipelineId: string, definitionHash: string, workflow: RunWorkflow) => {
+      setState((current) => {
+        const existing = current.runs.find((run) => run.definitionHash === definitionHash);
+
+        if (existing) {
+          return {
+            ...current,
+            runs: current.runs.map((run) =>
+              run.id === existing.id ? { ...run, pipelineId, workflow } : run,
+            ),
+            activeRunId: existing.id,
+            viewMode: "run",
+          };
+        }
+
+        const run: EvaluationRun = {
+          id: newRunId(),
+          name: `run${current.nextRunNumber}`,
+          pipelineId,
+          definitionHash,
+          createdAt: Date.now(),
+          workflow,
+          safetyAgentsChecked: false,
+          safetyAgentsInfo: null,
+          safetyAgentsError: null,
+          safetyReport: null,
+          agentReport: null,
+          agentCsvName: null,
+          reportsLoaded: true, // brand new: nothing saved to fetch
+          responses: [],
+        };
+
+        return {
+          ...current,
+          runs: [...current.runs, run],
+          activeRunId: run.id,
+          viewMode: "run",
+          nextRunNumber: current.nextRunNumber + 1,
+        };
+      });
+    },
+    [],
+  );
+
+  const pipelineIdForHash = useCallback(
+    (definitionHash: string) =>
+      state.runs.find((run) => run.definitionHash === definitionHash)?.pipelineId ?? null,
+    [state.runs],
+  );
 
   const selectRun = useCallback((runId: string) => {
     setState((current) =>
@@ -150,6 +244,43 @@ export function EvaluationRunsProvider({ children }: { children: ReactNode }) {
     setState((current) => (current.viewMode === "compare" ? current : { ...current, viewMode: "compare" }));
   }, []);
 
+  const addResponse = useCallback((runId: string, entry: { query: string; answer: string }) => {
+    const response: ChatResponseFeedback = {
+      id: newResponseId(),
+      query: entry.query,
+      answer: entry.answer,
+      createdAt: Date.now(),
+      vote: null,
+      explanation: "",
+    };
+    setState((current) => ({
+      ...current,
+      runs: current.runs.map((run) =>
+        run.id === runId ? { ...run, responses: [...run.responses, response] } : run,
+      ),
+    }));
+    return response.id;
+  }, []);
+
+  const setResponseFeedback = useCallback(
+    (runId: string, responseId: string, patch: { vote: "up" | "down" | null; explanation: string }) => {
+      setState((current) => ({
+        ...current,
+        runs: current.runs.map((run) =>
+          run.id === runId
+            ? {
+                ...run,
+                responses: run.responses.map((response) =>
+                  response.id === responseId ? { ...response, ...patch } : response,
+                ),
+              }
+            : run,
+        ),
+      }));
+    },
+    [],
+  );
+
   const activeRun = useMemo(
     () => state.runs.find((run) => run.id === state.activeRunId) ?? null,
     [state.runs, state.activeRunId],
@@ -161,26 +292,34 @@ export function EvaluationRunsProvider({ children }: { children: ReactNode }) {
       activeRun,
       bestRunId: state.bestRunId,
       viewMode: state.viewMode,
-      ensureRunForPipeline,
+      nextRunNumber: state.nextRunNumber,
+      recordCompiledRun,
+      pipelineIdForHash,
       selectRun,
       renameRun,
       updateRun,
       markBest,
       deleteRun,
       showCompare,
+      addResponse,
+      setResponseFeedback,
     }),
     [
       state.runs,
       activeRun,
       state.bestRunId,
       state.viewMode,
-      ensureRunForPipeline,
+      state.nextRunNumber,
+      recordCompiledRun,
+      pipelineIdForHash,
       selectRun,
       renameRun,
       updateRun,
       markBest,
       deleteRun,
       showCompare,
+      addResponse,
+      setResponseFeedback,
     ],
   );
 

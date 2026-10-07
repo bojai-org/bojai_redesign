@@ -57,6 +57,8 @@ export interface CompilerPipelineDefinition {
 /** Body of POST /pipelines/compile and PUT /pipelines/{pipeline_id} (backend/app.py CompileRequest). */
 export interface CompileRequest {
   pipeline_id?: string;
+  /** The project this pipeline belongs to; the backend saves it under that project. */
+  project_id?: string;
   definition: CompilerPipelineDefinition;
 }
 
@@ -71,6 +73,11 @@ export interface PipelineSummary {
 /** Body of POST /pipelines/{pipeline_id}/run (backend/app.py RunRequest). */
 export interface RunRequest {
   query?: string | null;
+  /** Retrieval agents accumulate the full resource list into their result on every
+   * hop, so a large corpus can make the trace much bigger than the answer itself.
+   * Defaults true on the backend; runPipeline() sends false since nothing here
+   * reads `trace`. */
+  include_trace?: boolean;
 }
 
 /** backend/app.py TraceStep. */

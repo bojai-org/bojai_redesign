@@ -20,52 +20,82 @@
   color: var(--amber);
 }
 
-.runCard {
+.chatCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  height: min(72vh, 680px);
+  min-height: 420px;
+  overflow: hidden;
 }
 
-.label {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink-700);
-}
-
-.actions {
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
   display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.emptyChat {
+  margin: auto;
+}
+
+.bubbleRow {
+  display: flex;
+  width: 100%;
+}
+
+.bubbleRowUser {
   justify-content: flex-end;
 }
 
-.error {
-  margin: 0;
-  font-size: 13px;
+.bubbleRowAssistant {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 78%;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.bubbleUser {
+  background: var(--bj-600);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.bubbleAssistant {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  border-bottom-left-radius: 4px;
+}
+
+.bubbleError {
+  background: var(--rose-100);
+  border-color: var(--rose);
   color: var(--rose);
 }
 
-.result {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-}
-
-.resultLabel {
-  margin: 0 0 6px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink-700);
-}
-
-.output {
+.userText {
   margin: 0;
-  padding: 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 50vh;
-  overflow: auto;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.composerInput {
+  flex: 1;
 }

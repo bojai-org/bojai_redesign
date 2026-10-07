@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../../components/data-display/Badge";
 import { Card } from "../../../components/data-display/Card";
@@ -7,51 +7,55 @@ import { LoadingSpinner } from "../../../components/feedback/LoadingSpinner";
 import { PageContainer } from "../../../components/layout/PageContainer";
 import { BuildApiError, getSafetyAgents } from "../../build/api/pipelineApi";
 import { usePipelineWorkspace } from "../../build/state/PipelineWorkspaceContext";
+import { getRunReports } from "../../projects/api/projectStateApi";
+import { useProjectPersistence } from "../../projects/state/ProjectPersistenceContext";
 import { AgentEvaluationPanel } from "../components/AgentEvaluationPanel";
 import { CompareRunsPanel } from "../components/CompareRunsPanel";
-import { RunSidebar } from "../components/RunSidebar";
+import { ResponsesPanel } from "../components/ResponsesPanel";
 import { SafetyPanel } from "../components/SafetyPanel";
 import { useEvaluationRuns } from "../state/EvaluationRunsContext";
 import styles from "./EvaluatePage.module.css";
 
+type RunSubView = "evaluation" | "responses";
+
 export function EvaluatePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { compileState, invalidatePipelineId } = usePipelineWorkspace();
-  const {
-    runs,
-    activeRun,
-    bestRunId,
-    viewMode,
-    ensureRunForPipeline,
-    selectRun,
-    renameRun,
-    updateRun,
-    markBest,
-    deleteRun,
-    showCompare,
-  } = useEvaluationRuns();
+  // Which run is shown is picked in the project-wide RunBar, not here.
+  const { runs, activeRun, bestRunId, viewMode, updateRun } = useEvaluationRuns();
+  const [subView, setSubView] = useState<RunSubView>("evaluation");
+  const { projectId: savedProjectId } = useProjectPersistence();
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const reportsInFlight = useRef(new Set<string>());
+
+  // Saved reports aren't part of the project state (they can be large) --
+  // fetch them for the run being viewed, or for every run when comparing.
+  useEffect(() => {
+    const needed = (viewMode === "compare" ? runs : activeRun ? [activeRun] : []).filter(
+      (run) => !run.reportsLoaded && !reportsInFlight.current.has(run.id),
+    );
+    for (const run of needed) {
+      reportsInFlight.current.add(run.id);
+      getRunReports(savedProjectId, run.id)
+        .then((reports) => {
+          updateRun(run.id, {
+            safetyReport: reports.safety?.report ?? null,
+            agentReport: reports.agent?.report ?? null,
+            agentCsvName: reports.agent?.csv_name ?? null,
+            reportsLoaded: true,
+          });
+        })
+        .catch((error) => {
+          setReportsError(
+            error instanceof BuildApiError ? error.message : "Could not load this run's saved results.",
+          );
+        })
+        .finally(() => reportsInFlight.current.delete(run.id));
+    }
+  }, [viewMode, runs, activeRun, savedProjectId, updateRun]);
 
   const pipelineId = compileState.pipelineId;
   const currentDefinitionHash = compileState.lastCompiledDefinitionHash;
-
-  // Deleting the run that matches the live compiled pipeline would otherwise
-  // leave nothing to evaluate against until the next navigation re-triggers
-  // the "ensure a run exists" effect below -- re-asserting it immediately
-  // after every delete is a no-op unless that's exactly what just happened.
-  const handleDeleteRun = (runId: string) => {
-    deleteRun(runId);
-    if (pipelineId && currentDefinitionHash) {
-      ensureRunForPipeline(pipelineId, currentDefinitionHash);
-    }
-  };
-
-  // Every time this tab is opened (including returning from Build after a
-  // recompile), resolve which run the currently-compiled pipeline belongs to
-  // -- starting a new one if its definition hash hasn't been seen before.
-  useEffect(() => {
-    if (!pipelineId || !currentDefinitionHash) return;
-    ensureRunForPipeline(pipelineId, currentDefinitionHash);
-  }, [pipelineId, currentDefinitionHash, ensureRunForPipeline]);
 
   // One-time "does this run's pipeline have safety agents" lookup, cached on
   // the run itself so switching between runs never refetches.
@@ -117,49 +121,74 @@ export function EvaluatePage() {
       </Card>
 
       <div className={styles.layout}>
-        <RunSidebar
-          runs={runs}
-          activeRunId={activeRun?.id ?? null}
-          bestRunId={bestRunId}
-          viewMode={viewMode}
-          currentDefinitionHash={currentDefinitionHash}
-          onSelect={selectRun}
-          onRename={renameRun}
-          onMarkBest={markBest}
-          onDelete={handleDeleteRun}
-          onCompare={showCompare}
-        />
-
         <div className={styles.main}>
           {viewMode === "compare" ? (
             <CompareRunsPanel runs={runs} bestRunId={bestRunId} />
           ) : activeRun ? (
             <>
-              {!activeRun.safetyAgentsChecked && (
-                <LoadingSpinner size="sm" label="Checking for safety agents…" />
-              )}
-              {activeRun.safetyAgentsError && <p className={styles.error}>{activeRun.safetyAgentsError}</p>}
-              {activeRun.safetyAgentsInfo?.has_safety_agents && (
-                <SafetyPanel
-                  pipelineId={activeRun.pipelineId}
-                  agentsInfo={activeRun.safetyAgentsInfo}
-                  report={activeRun.safetyReport}
-                  onResult={(report) => updateRun(activeRun.id, { safetyReport: report })}
-                  readOnly={!isCurrentRun}
-                />
-              )}
+              <div className={styles.subTabs} role="tablist" aria-label="Run view">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={subView === "evaluation"}
+                  className={subView === "evaluation" ? styles.subTabActive : styles.subTab}
+                  onClick={() => setSubView("evaluation")}
+                >
+                  Evaluation
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={subView === "responses"}
+                  className={subView === "responses" ? styles.subTabActive : styles.subTab}
+                  onClick={() => setSubView("responses")}
+                >
+                  Responses{activeRun.responses.length > 0 ? ` (${activeRun.responses.length})` : ""}
+                </button>
+              </div>
 
-              <AgentEvaluationPanel
-                pipelineId={activeRun.pipelineId}
-                report={activeRun.agentReport}
-                onResult={(response) =>
-                  updateRun(activeRun.id, {
-                    agentReport: response.agent,
-                    ...(response.safety ? { safetyReport: response.safety } : {}),
-                  })
-                }
-                readOnly={!isCurrentRun}
-              />
+              {subView === "responses" ? (
+                <ResponsesPanel run={activeRun} />
+              ) : (
+                <>
+                  {!activeRun.safetyAgentsChecked && (
+                    <LoadingSpinner size="sm" label="Checking for safety agents…" />
+                  )}
+                  {activeRun.safetyAgentsError && (
+                    <p className={styles.error}>{activeRun.safetyAgentsError}</p>
+                  )}
+                  {!activeRun.reportsLoaded && (
+                    <LoadingSpinner size="sm" label="Loading saved results…" />
+                  )}
+                  {reportsError && <p className={styles.error}>{reportsError}</p>}
+                  {activeRun.safetyAgentsInfo?.has_safety_agents && (
+                    <SafetyPanel
+                      pipelineId={activeRun.pipelineId}
+                      runId={activeRun.id}
+                      agentsInfo={activeRun.safetyAgentsInfo}
+                      report={activeRun.safetyReport}
+                      onResult={(report) => updateRun(activeRun.id, { safetyReport: report })}
+                      readOnly={!isCurrentRun}
+                    />
+                  )}
+
+                  <AgentEvaluationPanel
+                    projectId={savedProjectId}
+                    pipelineId={activeRun.pipelineId}
+                    runId={activeRun.id}
+                    report={activeRun.agentReport}
+                    reportCsvName={activeRun.agentCsvName}
+                    onResult={(response, csvName) =>
+                      updateRun(activeRun.id, {
+                        agentReport: response.agent,
+                        agentCsvName: csvName,
+                        ...(response.safety ? { safetyReport: response.safety } : {}),
+                      })
+                    }
+                    readOnly={!isCurrentRun}
+                  />
+                </>
+              )}
             </>
           ) : (
             <LoadingSpinner size="sm" label="Loading run…" />

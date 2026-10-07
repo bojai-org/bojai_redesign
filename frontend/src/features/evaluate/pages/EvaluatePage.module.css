@@ -39,3 +39,31 @@
   font-size: 13px;
   color: var(--rose);
 }
+
+.subTabs {
+  display: flex;
+  gap: 6px;
+}
+
+.subTab,
+.subTabActive {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.subTab:hover {
+  border-color: var(--bj-400);
+  color: var(--bj-700);
+}
+
+.subTabActive {
+  background: var(--bj-100);
+  border-color: var(--bj-600);
+  color: var(--bj-700);
+}

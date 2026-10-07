@@ -125,7 +125,7 @@ export interface EvaluationResponse {
 // GET .../jobs/{job_id} endpoint for progress and the final result.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type EvaluationJobState = "running" | "done" | "error";
+export type EvaluationJobState = "running" | "done" | "error" | "cancelled";
 
 export interface EvaluationJobHandle {
   job_id: string;

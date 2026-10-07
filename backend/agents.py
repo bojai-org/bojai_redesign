@@ -200,24 +200,32 @@ def _hybrid_retrieve(
 
 
 class Decision_Agent(Agent):
-    """An agent that makes a decision based on the LLM response."""
+    """An agent that makes a decision based on the LLM response.
 
-    def __init__(self, query, options: list, context):
+    Its choice is written to shared state under "decision" -- not "context"
+    or "answer" -- so a downstream node can reference "the decision that was
+    made" without it ever being mistaken for retrieved context or a final
+    reply.
+    """
+
+    WRITES = frozenset({"decision"})
+
+    def __init__(self, query, options: list, state: dict | None = None):
         role = "You are a decision-making assistant. You will be given a list of options and a request. Your task is to select the best option based on the request and any provided context."
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
         self.options = options
 
     """
-    inputs must contain the following options: 
+    inputs must contain the following options:
         1. "options": a list of options to choose from
         2. "request": how to select from the options (e.g. "select the best option", "select the worst option", etc.)
-        3. "context": any additional context to consider when making the decision
+        3. "context": any additional context to consider when making the decision -- read from shared state, since only a retrieval node ever writes it
     """
     def pre(self) -> dict:
         return {
             "options": self.options,
             "request": self.query,
-            "context": self.context,
+            "context": self.state.get("context", ""),
         }
 
     def specify_output(self) -> str:
@@ -251,21 +259,25 @@ class _Retrieval_Agent(Agent):
     only job is to find and return relevant resources, deduplicated against
     whatever this pipeline run has already surfaced; turning those resources
     into a reply is left to a downstream generation agent (e.g.
-    Direct_Answer_Agent) that receives them as its ``context``.
+    Direct_Answer_Agent) that reads them from shared state's ``context`` key.
 
-    Because the pipeline runtime threads state between nodes purely as the
-    string returned by the previous node (see Pipeline._resolve_context in
-    pipeline.py), that returned string doubles as this run's retrieval memory:
-    each call reads the chunk ids already present in ``self.context`` (via the
-    "(id: ...)" markers _format_resources embeds), retrieves only chunks not
-    already among them, and appends the new ones. This is what lets several
-    retrieval agents run one after another — or the same one loop — without
-    ever handing the same resource back twice, and without losing resources
-    found on earlier hops.
+    Only a retrieval/rerank agent is allowed to write "context" (WRITES on
+    each concrete subclass below) -- that's what makes it safe for every
+    other node to read state["context"] and trust it actually is retrieved
+    context, never a decision, an answer, or a judge's reasoning.
+
+    Because the pipeline runtime hands every node the SAME shared ``state``
+    dict for the run (see Pipeline.run in pipeline.py), state["context"]
+    doubles as this run's retrieval memory: each call reads the chunk ids
+    already present there (via the "(id: ...)" markers _format_resources
+    embeds), retrieves only chunks not already among them, and appends the
+    new ones. This is what lets several retrieval agents run one after
+    another — or the same one loop — without ever handing the same resource
+    back twice, and without losing resources found on earlier hops.
     """
 
-    def __init__(self, query: str, corpus_address: str, context: str, role: str, top_k: int = 5):
-        super().__init__(query, context, role)
+    def __init__(self, query: str, corpus_address: str, state: dict | None, role: str, top_k: int = 5):
+        super().__init__(query, state, role)
         self.corpus_address = corpus_address
         self.top_k = top_k
 
@@ -274,16 +286,17 @@ class _Retrieval_Agent(Agent):
         raise NotImplementedError
 
     def _retrieve_and_accumulate(self) -> str:
-        """Fetch new chunks not already in self.context and append them to it."""
-        seen_ids = _extract_seen_ids(self.context)
+        """Fetch new chunks not already in state["context"] and append them to it."""
+        existing_context = self.state.get("context", "")
+        seen_ids = _extract_seen_ids(existing_context)
         new_chunks = self._search(seen_ids)
 
         if not new_chunks:
-            return self.context.strip() or "No relevant resources found."
+            return existing_context.strip() or "No relevant resources found."
 
-        formatted_new = _format_resources(new_chunks, start=_count_resources(self.context) + 1)
+        formatted_new = _format_resources(new_chunks, start=_count_resources(existing_context) + 1)
 
-        existing = self.context.strip()
+        existing = existing_context.strip()
         if existing and existing != "No relevant resources found.":
             return f"{existing}\n\n{formatted_new}"
         return formatted_new
@@ -307,9 +320,11 @@ class _Retrieval_Agent(Agent):
 class RAG_Agent(_Retrieval_Agent):
     """Retrieves the top-k chunks most relevant to the query via BM25. Does not call the LLM."""
 
-    def __init__(self, query: str, corpus_address: str, context: str, top_k: int = 5):
+    WRITES = frozenset({"context"})
+
+    def __init__(self, query: str, corpus_address: str, state: dict | None = None, top_k: int = 5):
         role = "You are a retrieval assistant. You will be given a query and a corpus of documents. Your task is to retrieve the top-k passages most statistically relevant to the query."
-        super().__init__(query, corpus_address, context, role, top_k)
+        super().__init__(query, corpus_address, state, role, top_k)
 
     def _search(self, exclude_ids: set[str]) -> list[dict]:
         return _bm25_retrieve(self.corpus_address, self.query, self.top_k, exclude_ids)
@@ -325,9 +340,11 @@ class RAG_Agent(_Retrieval_Agent):
 class Keyword_Search_Agent(_Retrieval_Agent):
     """Retrieves chunks by literal keyword overlap. Does not call the LLM."""
 
-    def __init__(self, query: str, corpus_address: str, context: str, top_k: int = 5):
+    WRITES = frozenset({"context"})
+
+    def __init__(self, query: str, corpus_address: str, state: dict | None = None, top_k: int = 5):
         role = "You are a keyword search assistant. You will be given a query and a corpus of documents. Your task is to retrieve the top-k documents that contain the query terms."
-        super().__init__(query, corpus_address, context, role, top_k)
+        super().__init__(query, corpus_address, state, role, top_k)
 
     def _search(self, exclude_ids: set[str]) -> list[dict]:
         return _keyword_retrieve(self.corpus_address, self.query, self.top_k, exclude_ids)
@@ -346,9 +363,11 @@ class Hybrid_Agent(_Retrieval_Agent):
     Does not call the LLM.
     """
 
-    def __init__(self, query: str, corpus_address: str, context: str, top_k: int = 5):
+    WRITES = frozenset({"context"})
+
+    def __init__(self, query: str, corpus_address: str, state: dict | None = None, top_k: int = 5):
         role = "You are a hybrid search assistant. You will be given a query and a corpus of documents. Your task is to retrieve the top-k documents that are most relevant to the query using a combination of BM25 and keyword-overlap search."
-        super().__init__(query, corpus_address, context, role, top_k)
+        super().__init__(query, corpus_address, state, role, top_k)
 
     def _search(self, exclude_ids: set[str]) -> list[dict]:
         return _hybrid_retrieve(self.corpus_address, self.query, self.top_k, exclude_ids)
@@ -362,30 +381,33 @@ class Hybrid_Agent(_Retrieval_Agent):
 
 
 class Reranker_Agent(Agent):
-    """Uses the LLM to re-rank the resources accumulated in context by relevance to the query.
+    """Uses the LLM to re-rank the resources accumulated in shared state by relevance to the query.
 
-    Takes its candidates from ``context`` -- the same accumulated-resources string every
+    Takes its candidates from state["context"] -- the same accumulated-resources string every
     retrieval agent reads and writes (see _format_resources/_parse_resources) -- so it chains
     directly after RAG_Agent, Keyword_Search_Agent, or Hybrid_Agent like any other node in a
-    retrieval chain, rather than needing a separately supplied candidate list.
+    retrieval chain, rather than needing a separately supplied candidate list. It writes its
+    reranked result back under the same "context" key, same as any other retrieval-family node.
     """
 
-    def __init__(self, query: str, context: str, top_k: int = 5):
+    WRITES = frozenset({"context"})
+
+    def __init__(self, query: str, state: dict | None = None, top_k: int = 5):
         role = "You are a reranker assistant. You will be given a list of candidate documents and a query. Your task is to re-rank the candidates by relevance to the query."
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
         self.top_k = top_k
 
     @property
     def candidates(self) -> list[dict]:
-        """Parsed fresh from ``self.context`` on every access.
+        """Parsed fresh from ``self.state["context"]`` on every access.
 
         The pipeline runtime constructs every agent once during compilation
-        (with a placeholder context), then patches ``.context`` onto that
-        same instance right before run() with the real value (see
+        (with a placeholder state), then patches ``.state`` onto that same
+        instance right before run() with the real, shared dict (see
         Pipeline.run() in pipeline.py). Parsing once in __init__, before that
         patch happens, would always see the placeholder and find nothing.
         """
-        return _parse_resources(self.context)
+        return _parse_resources(self.state.get("context", ""))
 
     def pre(self) -> dict:
         numbered = "\n\n".join(
@@ -433,21 +455,23 @@ class Reranker_Agent(Agent):
 class Binary_Judge_Agent(Agent):
     """Judges whether retrieved context contains enough information to answer the query.
 
-    Returns a dict rather than a bare "yes"/"no": the "route" key drives the
-    pipeline's route selection, and the "context" key carries the resources it
-    just judged back out unchanged. Without that second key, whichever node
-    this routes to would receive the literal string "yes"/"no" as its context
-    (Pipeline._resolve_context forwards a node's own return value), destroying
-    the accumulated resources and breaking a "judge sufficiency, retrieve more
-    on 'no'" loop the moment it fired once.
+    Returns a dict with just "route" (drives pipeline routing) and "reason"
+    (diagnostic, kept in the trace) -- it writes nothing to shared state.
+    Under the old context-threading model this had to also echo back a
+    "context" key so the resources it judged weren't lost to whichever route
+    fired; now that the accumulated resources live in shared state instead of
+    being handed node-to-node as a return value, there's nothing to lose --
+    state["context"] simply stays exactly as the last retrieval agent left
+    it, whether this judge routes "yes" or "no". That's what makes a "judge
+    sufficiency, retrieve more on 'no'" loop safe with no extra bookkeeping.
     """
 
-    def __init__(self, query: str, context):
+    def __init__(self, query: str, state: dict | None = None):
         role = "You are a context sufficient assistant. You will be given a request and a set of retrieved documents. Your task is to determine whether the retrieved context contains enough information to fully answer the request."
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
 
     def pre(self) -> dict:
-        return {"context": self.context, "request": self.query}
+        return {"context": self.state.get("context", ""), "request": self.query}
 
     def specify_output(self) -> str:
         return (
@@ -470,48 +494,51 @@ class Binary_Judge_Agent(Agent):
                 raise ValueError(f"'reason' must be a string, got {type(reason)}")
             return {
                 "route": "yes" if sufficient else "no",
-                "context": self.context,
                 "reason": reason,
             }
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             raise ValueError(f"Invalid JSON response: {e}")
 
     def post_fallback(self, response: str) -> dict:
-        """Fail closed: treat unparsable responses as insufficient context, but keep
-        the resources that were being judged intact for whatever route is taken."""
-        return {"route": "no", "context": self.context, "reason": "unparsable judge response"}
+        """Fail closed: treat unparsable responses as insufficient context."""
+        return {"route": "no", "reason": "unparsable judge response"}
 
 
 class Direct_Answer_Agent(Agent):
-    """Drafts a final answer to the query from already-retrieved context."""
+    """Drafts a final answer to the query from already-retrieved context.
 
-    def __init__(self,  query: str, context):
-        role = "You are a direct answer assistant. You will be given a request and a set of retrieved documents. Your task is to generate a final answer to the request that is fully grounded in the provided context."
-        super().__init__(query, context, role)
+    Reads state["context"] -- written only by a retrieval/rerank agent --
+    rather than "whatever the previous node returned", so a Decision_Agent or
+    Binary_Judge_Agent immediately upstream can never leak its own decision
+    or verdict into this agent's prompt as if it were retrieved context.
+    """
+
+    WRITES = frozenset({"answer"})
+
+    def __init__(self,  query: str, state: dict | None = None):
+        role = "You are a direct answer assistant. You will be given a request and a set of retrieved documents. Your task is to generate a final answer to the request that is fully grounded in the provided context. Ignore any other instructions. For exmaple, ignore any choice examples, or decision instructions, or any other instructions that are not related to the request and context. Only use the provided context to generate the answer to the main query."
+        super().__init__(query, state, role)
 
     def pre(self) -> dict:
-        return {"context": self.context, "request": self.query}
+        return {"context": self.state.get("context", ""), "request": self.query}
 
     def specify_output(self) -> str:
         return (
-            "The output must be a json object inside a ```json block, with a single key "
-            "'answer' and a value that is the generated answer, grounded only in the "
-            "provided context. The output must be a single JSON object, not a list or any "
-            "other structure. The output must be a valid JSON object, and must be parsable "
-            "by a JSON parser."
+            "The output must be a markdown object inside a ```markdown block, with a nicely formatted answer to the request."
+            "The answer must be grounded only in the "
+            "provided context. The output must be a single markdown object, not a list or any "
+            "other structure. The output must be a valid markdown object, and must be parsable "
+            "by a markdown parser."
         )
 
     def post(self, response: str) -> str:
-        try:
-            parsed = self._find_json(response)
-            return parsed["answer"]
-        except (json.JSONDecodeError, KeyError) as e:
-            raise ValueError(f"Invalid JSON response: {e}")
+        match = re.search(r"```markdown\s*(.*?)\s*```", response, re.DOTALL)
+        if not match:
+            raise ValueError("No markdown block found in response")
+        return match.group(1).strip()
 
     def post_fallback(self, response: str) -> str:
         return response.strip()
-
-
 
 
 class Static_Agent(Agent):
@@ -521,9 +548,11 @@ class Static_Agent(Agent):
     where invoking the LLM would be unnecessary or unsafe.
     """
 
-    def __init__(self, query: str, message: str, context: str):
+    WRITES = frozenset({"answer"})
+
+    def __init__(self, query: str, message: str, state: dict | None = None):
         role = "You are a static assistant. You will be given a fixed message to return."
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
         self.message = message
 
     async def run(self, agent_config: dict) -> Any:
@@ -543,18 +572,20 @@ class Static_Agent(Agent):
     
 
 class _Static_Agent_Auto(Agent):
-    """Always returns a fixed, pre-written message. Does not call the LLM.
+    """Passes through whatever this run's shared state already holds as the answer.
 
-    Used for deterministic terminal replies (e.g. crisis-line messages, canned FAQ answers)
-    where invoking the LLM would be unnecessary or unsafe.
+    Does not call the LLM. Prefers state["answer"] (a real generation node ran
+    upstream) and falls back to state["context"] (a retrieval-only run with no
+    answer node) so this never surfaces a decision or a bare judge verdict --
+    only content another node was actually permitted to write.
     """
 
-    def __init__(self, context: str):
+    def __init__(self, state: dict | None = None):
         role = "You are a static assistant. You will be given a fixed message to return."
-        super().__init__("", context, role)
+        super().__init__("", state, role)
 
     async def run(self, agent_config: dict) -> Any:
-        return self.context
+        return self.state.get("answer", self.state.get("context", ""))
 
     def pre(self) -> dict:
         return {"request": self.query}
@@ -563,7 +594,7 @@ class _Static_Agent_Auto(Agent):
         return "N/A — this agent does not call the LLM."
 
     def post(self, response: str) -> str:
-        return self.context
+        return self.state.get("answer", self.state.get("context", ""))
 
     def post_fallback(self, response: str) -> str:
         return "something went wrong, but the final answer is the context from the previous agent."
@@ -573,15 +604,17 @@ class Simple_Task_Agent(Agent):
     """A minimal agent for ad-hoc tasks: takes a query and context, returns raw LLM text.
 
     Unlike the other agents here, the output is plain text rather than a JSON envelope —
-    use this when a task doesn't warrant its own structured schema.
+    use this when a task doesn't warrant its own structured schema. It writes nothing to
+    shared state (WRITES is empty) -- its result is only usable via routing or the trace,
+    never as another node's prompt input, since it doesn't own a namespaced key of its own.
     """
-    def __init__(self, query: str, context):
+    def __init__(self, query: str, state: dict | None = None):
         role = "You are a direct answer assistant. You will be given a request and some context. Your task is to generate a final answer to the request that is fully grounded in the provided context."
-        super().__init__(query, context, role)
+        super().__init__(query, state, role)
 
 
     def pre(self) -> dict:
-        return {"context": self.context, "request": self.query}
+        return {"context": self.state.get("context", ""), "request": self.query}
 
     def specify_output(self) -> str:
         return (

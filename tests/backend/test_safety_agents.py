@@ -86,15 +86,19 @@ def test_static_barrier_default_context():
     assert sa.Static_Barrier_Agent("q").context == sa.DEFAULT_BARRIER_CONTEXT
 
 
-async def test_static_barrier_result_carries_its_own_context_through():
-    """A barrier's result must carry its incoming context under "context" -- if it
-    didn't, Pipeline._resolve_context would forward str(this_dict) as the next
-    node's context instead of the actual text being screened, for any pipeline
-    that places a barrier mid-chain rather than only at the entrypoint.
+async def test_static_barrier_result_does_not_echo_context():
+    """Under the old context-threading model a barrier had to echo its incoming
+    context back out under a "context" key so a downstream node wouldn't lose
+    it. Now that accumulated context lives in shared pipeline state instead of
+    being handed node-to-node as a return value, there's nothing to echo: the
+    barrier's own `context` constructor arg is just a fixed background
+    description (see test_static_barrier_default_context above), unrelated to
+    shared state, and untouched by whatever this barrier's result carries.
     """
     agent = sa.Static_Barrier_Agent("I want to kill myself", context="upstream text")
     result = await agent.run({})
-    assert result["context"] == "upstream text"
+    assert "context" not in result
+    assert agent.context == "upstream text"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -167,13 +171,14 @@ def test_nn_barrier_post_fallback_fails_closed_to_escalate():
     assert result["score"] is None
 
 
-async def test_nn_barrier_result_carries_its_own_context_through():
+async def test_nn_barrier_result_does_not_echo_context():
     async def embed_texts(texts, embedding_config):
         return [[1.0, 0.0]] * len(texts)
 
     agent = sa.Neural_Network_Barrier_Agent("q", {}, embed_texts, context="upstream text")
     result = await agent.run({})
-    assert result["context"] == "upstream text"
+    assert "context" not in result
+    assert agent.context == "upstream text"
 
 
 def test_nn_barrier_post_out_of_range_score_raises():
@@ -242,10 +247,11 @@ def test_judge_barrier_post_fallback_fails_closed():
     assert result["answer"] == sa.INPUT_DECLINE_MESSAGE
 
 
-def test_judge_barrier_result_carries_its_own_context_through():
+def test_judge_barrier_result_does_not_echo_context():
     agent = sa.Judge_Barrier_Agent("q", context="upstream text")
     result = agent.post('```json\n{"harmful": false, "reason": "benign"}\n```')
-    assert result["context"] == "upstream text"
+    assert "context" not in result
+    assert agent.context == "upstream text"
 
 
 async def test_judge_barrier_run_success(fake_llm, agent_config):

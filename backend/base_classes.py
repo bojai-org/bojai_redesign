@@ -38,17 +38,37 @@ MAX_TRIES = 3
 class Agent(ABC):
     """Abstract base class for a single LLM-backed step.
 
-    ``context`` is a plain string, not a shared mutable object: the pipeline
-    runtime sets it to the raw output of whichever predecessor routed into
-    this node (see Pipeline._resolve_context in pipeline.py), so it is the
-    only channel through which information flows from one node to the next.
-    Agents that need to carry structured state (e.g. retrieved resources)
-    across multiple hops must encode and decode it from that string — see
-    the retrieval agents in agents.py.
+    ``state`` is a dict shared by every node in one pipeline run (see
+    Pipeline.run in pipeline.py): the runtime hands the SAME dict to each
+    node in turn, patched onto ``self.state`` immediately before that node
+    executes. It is a namespaced blackboard, not a free-for-all -- a node
+    may read any key it likes, but the runtime only ever copies a key out of
+    a node's *result* and into shared state if that node's class declares it
+    in ``WRITES``. This is what keeps a RAG hop's retrieved passages (the
+    "context" key) from ever being confused with another node's final reply
+    (the "answer" key) or a router's chosen option (the "decision" key): a
+    node that wants "the retrieved context" reads state["context"] itself in
+    pre() rather than being handed "whatever the previous node returned" and
+    guessing at what it means.
+
+    ``WRITES`` is empty by default (nothing is written to shared state); a
+    subclass that produces content another node should be able to read
+    declares the key(s) it owns, e.g. ``WRITES = frozenset({"context"})`` for
+    a retrieval agent. See Pipeline._collect_state_writes for how a node's
+    raw result is filtered down to just those keys before being merged in --
+    and PipelineRuntimeError raised if a result carries a namespaced key
+    (see pipeline._STATE_KEYS) the node isn't declared to own.
+
+    Some agents also take a plain, per-instance ``context`` constructor
+    argument (e.g. the safety barrier agents' fixed deployment description).
+    That is unrelated to shared ``state`` -- it is static configuration set
+    once and never touched by the pipeline runtime, not pipeline-flowing data.
     """
-    def __init__(self, query, context: str, role: str):
+    WRITES: frozenset[str] = frozenset()
+
+    def __init__(self, query, state: dict | None, role: str):
         self.query = query
-        self.context = context
+        self.state: dict[str, Any] = state if state is not None else {}
         self.role = role
 
     @abstractmethod
@@ -82,7 +102,15 @@ class Agent(ABC):
         return root
 
     def _prompt_config(self) -> dict:
-        return {"role" : self.role, "query" : self.query, "context" : self.context}
+        """Base prompt fields common to every agent.
+
+        Deliberately does NOT include any shared-state key (e.g. "context")
+        -- unlike ``self.query``/``self.role``, shared state is namespaced
+        and agent-specific, so it is each agent's own pre() that decides
+        which key(s) of self.state (if any) belong in its prompt, and under
+        what field name.
+        """
+        return {"role": self.role, "query": self.query}
     
     @abstractmethod
     def post(self, response: str) -> Any:

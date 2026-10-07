@@ -1,3 +1,32 @@
+.wrapper {
+  position: relative;
+}
+
+/* Revealed on hover/focus so cards stay uncluttered; always shown on touch
+   screens, which have no hover. */
+.deleteButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.wrapper:hover .deleteButton,
+.deleteButton:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .deleteButton {
+    opacity: 1;
+  }
+}
+
+.deleteButton:hover {
+  color: var(--rose);
+}
+
 .link {
   text-decoration: none;
   color: inherit;

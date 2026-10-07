@@ -17,6 +17,16 @@ class PipelineRuntimeError(RuntimeError):
     """Raised when a compiled pipeline cannot be executed safely."""
 
 
+# The namespaced keys that make up a pipeline run's shared state (see
+# Pipeline.run / Pipeline._collect_state_writes). Any other key a node's
+# result dict happens to carry -- "route", "decision", "action", "reason",
+# "layer", "score", used purely to drive _select_route or for trace/
+# diagnostic purposes -- is not part of this registry and is never inspected
+# here; only these keys are ever merged into shared state, and only for a
+# node whose class declares it in WRITES.
+_STATE_KEYS: frozenset[str] = frozenset({"context", "answer", "decision"})
+
+
 @dataclass(slots=True)
 class ExecutionStep:
     node_id: str
@@ -138,11 +148,20 @@ class Pipeline:
         trace: list[ExecutionStep] = []
         caller_id: str | None = None
 
+        # One shared state dict per run -- never per agent instance, since
+        # compiled nodes (and their agent instances) are reused across every
+        # call to run() (see evaluator.py, which calls this once per CSV
+        # row). A literal "context" on the entrypoint's spec seeds it, the
+        # same way it always seeded the old per-node context string.
+        state: dict[str, Any] = {}
+        if "context" in current.spec:
+            state["context"] = current.spec["context"]
+
         for _ in range(self.max_steps):
             spec = current.spec
 
             if current.node_id == "_final":
-                final_output = outputs.get(caller_id) if caller_id else None
+                final_output = state.get("answer", outputs.get(caller_id) if caller_id else None)
                 outputs[current.node_id] = final_output
                 trace.append(ExecutionStep(current.node_id, final_output, None, None))
                 return PipelineResult(final_output, trace, outputs)
@@ -154,20 +173,16 @@ class Pipeline:
                 initial_query=initial_query,
                 effective_queries=effective_queries,
             )
-            context = self._resolve_context(
-                spec=spec,
-                caller_id=caller_id,
-                outputs=outputs,
-            )
             effective_queries[current.node_id] = query
 
             if hasattr(current.agent, "query"):
                 current.agent.query = query
-            if hasattr(current.agent, "context"):
-                current.agent.context = context
+            if hasattr(current.agent, "state"):
+                current.agent.state = state
 
             result = await self._run_agent(current.agent)
             outputs[current.node_id] = result
+            state.update(self._collect_state_writes(current.agent, result))
 
             route = self._select_route(current, result)
             target = current.routes.get(route) if route is not None else None
@@ -181,7 +196,7 @@ class Pipeline:
             )
 
             if target is None:
-                return PipelineResult(result, trace, outputs)
+                return PipelineResult(state.get("answer", result), trace, outputs)
 
             caller_id = current.node_id
             current = target
@@ -201,8 +216,8 @@ class Pipeline:
             parameters = signature.parameters
             if "query" in parameters and "query" not in kwargs:
                 kwargs["query"] = ""
-            if "context" in parameters and "context" not in kwargs:
-                kwargs["context"] = ""
+            if "state" in parameters and "state" not in kwargs:
+                kwargs["state"] = {}
             return factory(**kwargs)
         except (TypeError, ValueError) as exc:
             raise PipelineRuntimeError(
@@ -264,26 +279,55 @@ class Pipeline:
         return ""
 
     @staticmethod
-    def _resolve_context(
-        *,
-        spec: Mapping[str, Any],
-        caller_id: str | None,
-        outputs: Mapping[str, Any],
-    ) -> str:
-        if caller_id is None and "context" in spec:
-            return str(spec["context"])
-        if caller_id is None:
-            return ""
-        value = outputs.get(caller_id, "")
-        if isinstance(value, str):
-            return value
-        # A gate/judge agent (e.g. Binary_Judge_Agent) returns a dict so its verdict
-        # can drive routing without losing what it was actually judging: if that
-        # dict carries a "context" key, forward that instead of str()-ing the whole
-        # dict, so the resources it evaluated survive into whichever route is taken.
-        if isinstance(value, Mapping) and isinstance(value.get("context"), str):
-            return value["context"]
-        return str(value)
+    def _collect_state_writes(agent: Any, result: Any) -> dict[str, Any]:
+        """Filter *result* down to the shared-state keys *agent* is allowed to write.
+
+        Only keys in agent.WRITES are ever merged into shared state, and only
+        keys in the fixed _STATE_KEYS registry are ever inspected -- anything
+        else a dict result carries (route/action/reason/layer/score, ...) is
+        routing or diagnostic information, not shared state, and is left alone.
+
+        Raises PipelineRuntimeError if a Mapping result carries a namespaced
+        key (per _STATE_KEYS) that the agent's class does not declare owning.
+        """
+        writes: frozenset[str] = getattr(agent, "WRITES", frozenset())
+
+        # Checked regardless of whether `writes` is empty: an agent that
+        # declares no WRITES at all (e.g. Binary_Judge_Agent, a pure router)
+        # must still be caught if its dict result happens to carry a
+        # namespaced key -- that's the exact authoring mistake this
+        # enforcement exists to catch, and it would otherwise slip through
+        # silently for precisely the agents least expected to write state.
+        if isinstance(result, Mapping):
+            updates: dict[str, Any] = {}
+            for key in _STATE_KEYS:
+                if key not in result:
+                    continue
+                if key not in writes:
+                    raise PipelineRuntimeError(
+                        f"{type(agent).__name__} produced a {key!r} value but is not "
+                        f"declared to write it (WRITES={sorted(writes)})."
+                    )
+                if result[key] is not None:
+                    updates[key] = result[key]
+            return updates
+
+        if not writes:
+            return {}
+
+        # A scalar (e.g. str) result is only unambiguous as a shared-state
+        # write when the agent owns exactly one key -- there is no key
+        # embedded in the result itself to disambiguate against.
+        if len(writes) != 1:
+            raise PipelineRuntimeError(
+                f"{type(agent).__name__} returned a non-mapping result but declares "
+                f"{len(writes)} WRITES keys ({sorted(writes)}); a scalar result is "
+                "only unambiguous when exactly one key is declared."
+            )
+        if result is None:
+            return {}
+        (only_key,) = tuple(writes)
+        return {only_key: result}
 
     @staticmethod
     def _select_route(node: CompiledNode, result: Any) -> str | None:

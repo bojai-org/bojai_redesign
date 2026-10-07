@@ -109,7 +109,7 @@ Accepted forms:
 - One node ID or ordinal: exactly one allowed predecessor.
 - A list of node IDs or ordinals: the node may be called by **any one** of those predecessors.
 
-A list does not mean that all predecessor outputs are merged. At runtime the node receives context only from the predecessor that actually routed into it.
+A list does not mean that all predecessor outputs are merged. At runtime the node's `query` (§4) is resolved only from the predecessor that actually routed into it; shared state (§4a) is common to every node in the run regardless of `prev`, so which predecessor called a node has no bearing on what it can read from `self.state`.
 
 The compiler verifies that `prev` exactly matches the node's actual incoming routes. This prevents the forward and backward graph descriptions from disagreeing.
 
@@ -125,9 +125,23 @@ A numeric query reference must refer to a node whose effective query is availabl
 
 ### `context`
 
-Optional string. It is used only when the node has no actual calling predecessor, normally the entrypoint.
+Optional string. It is used only to seed the entrypoint node's initial shared state (§4a) -- a node with an actual calling predecessor ignores its own `context` field entirely.
 
-For every later node, context is automatically set to the output of the one predecessor that routed into it. When `prev` lists several nodes, only the actual caller's output becomes context.
+### 4a. Shared pipeline state
+
+Every node in one `Pipeline.run()` call shares a single state `dict`, created fresh for that run (never reused across separate `run()` calls on the same compiled `Pipeline`, since agent instances persist across runs -- see evaluator.py, which calls `run()` once per CSV row). It is a namespaced blackboard, not a free-for-all node-to-node string: a node may read any key it likes from `self.state`, but the runtime only ever copies a key out of a node's *result* and merges it into shared state if that node's agent class declares owning it, via a `WRITES` class attribute (`frozenset[str]`, empty by default).
+
+The registry of namespaced keys is fixed (`pipeline._STATE_KEYS`): `"context"` (written only by a retrieval/rerank agent -- `RAG_Agent`, `Keyword_Search_Agent`, `Hybrid_Agent`, `Reranker_Agent`), `"answer"` (written only by a node producing a final user-facing reply -- `Direct_Answer_Agent`, `Static_Agent`, and the safety barrier agents when they produce a decline message), and `"decision"` (written only by `Decision_Agent`, its chosen option). Any other key a node's result dict carries -- `"route"`, `"action"`, `"reason"`, `"layer"`, `"score"`, used purely to drive route extraction (§5) or for trace/diagnostic purposes -- is not part of this registry and is never inspected by the state-merge step.
+
+This is what keeps a retrieval hop's passages from ever being confused with another node's final reply or a router's chosen option: a node that wants "the retrieved context" reads `self.state["context"]` itself in `pre()` rather than being handed "whatever the previous node returned" and having to guess what it means. Concretely:
+
+- `Direct_Answer_Agent`, `Binary_Judge_Agent`, `Decision_Agent`, and `Simple_Task_Agent` all read `self.state.get("context", "")` explicitly wherever they need retrieved context in their prompt -- never a blanket, automatic field.
+- A node whose result dict happens to carry a namespaced key it does not declare in `WRITES` fails the run immediately with `PipelineRuntimeError`, rather than silently writing (or silently dropping) content another part of the pipeline depends on.
+- A node with `WRITES = frozenset()` (e.g. `Binary_Judge_Agent`, a pure router) writes nothing to shared state at all -- its result is only used for route extraction (§5) and the trace, never as another node's prompt input.
+
+Pipeline.run()'s final `output` (§6) prefers `state["answer"]` when any node wrote it, falling back to the terminal node's raw return value for a pipeline with no answer-writing node (e.g. one built purely for routing, or one that intentionally ends on a bare retrieval node).
+
+Some agents also take a plain, per-instance `context` **constructor argument** distinct from shared state -- e.g. the safety barrier agents' fixed deployment description (`DEFAULT_BARRIER_CONTEXT`). That is static configuration set once at construction and never touched by the pipeline runtime; it has nothing to do with the shared `state["context"]` key above.
 
 ### Agent constructor arguments
 
@@ -141,7 +155,7 @@ Fields that are not graph-control fields are passed to the registered agent cons
 - `routes`
 - decision route mapping keys
 
-For `Decision_Agent`, `options` is passed to its constructor.
+For `Decision_Agent`, `options` is passed to its constructor. A constructor parameter named `state` is auto-defaulted to `{}` by the runtime the same way `query` is auto-defaulted to `""` (§7) -- it is not read from the node's JSON spec.
 
 ## 5. Routing contract
 
@@ -211,11 +225,11 @@ The runtime tries to match routes using:
 
 If several routes exist and no route matches, execution fails rather than guessing.
 
-### Dict results and context passthrough
+### Dict results and shared state (no more context passthrough)
 
-A node's return value becomes both the input to route extraction above *and*, verbatim, the next node's `context` (§4) — whichever route is actually taken receives it. For a node whose only job is to decide a route (a gate or judge), returning a bare string or bool for a two-way decision would forward that same string/bool on as context, discarding whatever the node was gating in the first place.
+A node's return value is the input to route extraction above, and separately (§4a), the source of whatever it's declared to write into shared state via `WRITES` -- the two are independent uses of the same value, not one value serving both roles by convention.
 
-To gate without losing that payload, return a dict with a `"context"` key alongside the routing key: the runtime forwards `result["context"]` to the next node instead of stringifying the whole dict. `Binary_Judge_Agent` and the three barrier agents in `safety_agents.py` (`Static_Barrier_Agent`, `Neural_Network_Barrier_Agent`, `Judge_Barrier_Agent`) all follow this convention — their result always includes the exact `context` they were evaluating, unchanged, regardless of which way they route. This is what makes a "judge sufficiency, retrieve more on 'no'" loop (§8) safe: the `Binary_Judge_Agent` node's `"no"` route hands the resources it just judged back to the retrieval node it's chained to, not the literal string `"no"`.
+Earlier revisions of this contract required a gate/judge node to echo its incoming `context` back out under a `"context"` key in its result, so the next node wouldn't lose it (a bare string/bool route decision would otherwise become the next node's entire `context`). That requirement is gone: shared state (§4a) is not threaded node-to-node as a return value, so there is nothing for a routing-only node to lose. `Binary_Judge_Agent` and the three barrier agents in `safety_agents.py` (`Static_Barrier_Agent`, `Neural_Network_Barrier_Agent`, `Judge_Barrier_Agent`) all declare `WRITES = frozenset()` or `frozenset({"answer"})` and carry no `"context"` key in their result at all -- `state["context"]` simply stays whatever the last retrieval node left it, regardless of which way a routing node routes. This is what makes a "judge sufficiency, retrieve more on 'no'" loop (§8) safe with no extra bookkeeping: the `Binary_Judge_Agent` node's `"no"` route reaches the retrieval node it's chained to with shared state untouched.
 
 ## 6. `_final`
 
@@ -231,7 +245,7 @@ When omitted, the compiler appends:
 }
 ```
 
-Every terminal user node is connected to `_final` through a single `done` route. `_final` returns the output of the node that actually called it. It does not call the LLM and cannot have outgoing routes.
+Every terminal user node is connected to `_final` through a single `done` route. The pipeline's final `output` prefers `state["answer"]` (§4a) when any node wrote it during the run; otherwise it's the output of the node that actually called `_final`. `_final` does not call the LLM and cannot have outgoing routes.
 
 The registry must contain `_Static_Agent_Auto`, even when the compiler adds the node automatically.
 
@@ -253,26 +267,26 @@ async def run(self, agent_config: dict) -> Any:
 
 For compatibility with deterministic agents already present in BojAI, `run(self)` is also accepted. The pipeline inspects the signature and calls it without config only when it accepts no argument.
 
-The runtime updates `agent.query` and `agent.context` immediately before execution when those attributes exist.
+The runtime updates `agent.query` and `agent.state` immediately before execution when those attributes exist (§4a) -- not `agent.context`, which (when a class has one at all) is a fixed per-instance value the runtime never touches after construction.
 
 ## 8. Retrieval agents and accumulation
 
 `RAG_Agent`, `Keyword_Search_Agent`, and `Hybrid_Agent` (agents.py) are retrieval-only: `run()` never calls the LLM. Deciding what to do with retrieved resources — summarize them, answer from them, judge whether they're sufficient — is a separate node's job (typically `Direct_Answer_Agent` or `Binary_Judge_Agent`).
 
-Since a node's only channel to the next one is the plain string described in §4 (`context`), a retrieval agent's returned string doubles as retrieval memory for the rest of the run:
+A retrieval agent reads and writes shared state's `"context"` key (§4a) -- the only key it's declared to write -- which doubles as retrieval memory for the rest of the run:
 
 - Every chunk it renders is tagged with a machine-readable `(id: ...)` marker.
-- Before retrieving, it reads the ids already present in its incoming `context`.
-- It retrieves only chunks not already tagged with one of those ids, and appends them to the incoming text rather than replacing it.
+- Before retrieving, it reads the ids already present in `state["context"]`.
+- It retrieves only chunks not already tagged with one of those ids, and appends them to the existing text rather than replacing it.
 
 Practically, this means:
 
 - Chaining retrieval nodes directly into one another (`rag_1 -> rag_2 -> ...`, as in §1) never returns the same resource twice, and never loses what an earlier hop found.
 - A pipeline with a cycle that loops back through the same retrieval node (permitted per §9 below) exhausts the corpus for that query instead of retrieving the same top-k chunks forever.
 - Only the terminal generation node needs to call the LLM — retrieval hops in between do not.
-- `Binary_Judge_Agent` can gate that chain: route `"yes"` to a generation node and `"no"` back to another retrieval hop, and the resources it judged arrive intact either way, because it returns them under a `"context"` key rather than replacing them with its verdict (§5's "Dict results and context passthrough"). Placing a plain string- or bool-returning gate node in that same spot would silently truncate the chain instead — its return value becomes the next node's `context` verbatim.
+- `Binary_Judge_Agent` can gate that chain: route `"yes"` to a generation node and `"no"` back to another retrieval hop, and `state["context"]` arrives intact either way, because `Binary_Judge_Agent` writes nothing to shared state at all (`WRITES` is empty, §4a) -- there's nothing for it to disturb regardless of which route fires.
 
-`Reranker_Agent` chains into this the same way: it takes `context` like any other node, and recovers individual candidate chunks by parsing the `[Resource N] (id: ...) ...` blocks back out of it (`_parse_resources`, the inverse of `_format_resources`). Connect it directly after `RAG_Agent`, `Keyword_Search_Agent`, or `Hybrid_Agent` to re-rank what they found; it does not take a separate `candidates` constructor field.
+`Reranker_Agent` chains into this the same way: it reads candidates from `state["context"]` like any other node in the chain, and recovers individual candidate chunks by parsing the `[Resource N] (id: ...) ...` blocks back out of it (`_parse_resources`, the inverse of `_format_resources`). Connect it directly after `RAG_Agent`, `Keyword_Search_Agent`, or `Hybrid_Agent` to re-rank what they found; it does not take a separate `candidates` constructor field.
 
 ## 9. Graph validation
 
@@ -339,3 +353,4 @@ Every agent class in `agents.py` and `safety_agents.py` is safe to register this
 
 - `Neural_Network_Barrier_Agent` and `Input_Barrier_Pipeline` require `embed_texts`, a Python callable, as a constructor argument. A callable cannot be written in JSON text, so a pipeline definition using either one must be built as a Python `dict` (the `Mapping` form `compile_pipeline` accepts) with the real function embedded in the node's `agent_args`, not loaded from a `.json` file.
 - The barrier agents (`Static_Barrier_Agent`, `Neural_Network_Barrier_Agent`, `Judge_Barrier_Agent`) return a `BarrierResult` dict whose `action` key (`"safe"`, `"accept"`, `"escalate"`, `"escalate_judge"`, `"reject"`, `"harmful"`) is picked up automatically by the route-extraction rule in §5 — route your `routes`/`next` mapping off of those action values.
+- A custom agent that should participate in shared state (§4a) declares a `WRITES: frozenset[str]` class attribute naming the namespaced key(s) it owns (a subset of `pipeline._STATE_KEYS`); one that doesn't touch shared state at all (a pure router, a diagnostic-only step) simply omits it, inheriting `Agent`'s default of `frozenset()`.

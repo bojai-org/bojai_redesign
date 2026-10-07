@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Button } from "../../../components/actions/Button";
 import { Card } from "../../../components/data-display/Card";
 import { Tag } from "../../../components/data-display/Tag";
-import { BuildApiError, evaluateSafetyWithProgress } from "../../build/api/pipelineApi";
+import {
+  BuildApiError,
+  EvaluationCancelledError,
+  cancelSafetyJob,
+  evaluateSafetyWithProgress,
+} from "../../build/api/pipelineApi";
 import type { SafetyAgentsResponse, SafetyEvalResponse } from "../../build/types/evaluation";
 import { ConfusionMatrix } from "./ConfusionMatrix";
 import { EvaluationProgressBar } from "./EvaluationProgressBar";
@@ -13,6 +18,8 @@ import styles from "./SafetyPanel.module.css";
 
 export interface SafetyPanelProps {
   pipelineId: string;
+  /** The run this report belongs to -- the backend saves it there when the job finishes. */
+  runId: string;
   agentsInfo: SafetyAgentsResponse;
   report: SafetyEvalResponse | null;
   onResult: (report: SafetyEvalResponse) => void;
@@ -32,6 +39,7 @@ function formatPercent(value: number): string {
  * of the pipeline itself (see backend/evaluator.py's module docstring). */
 export function SafetyPanel({
   pipelineId,
+  runId,
   agentsInfo,
   report,
   onResult,
@@ -40,20 +48,42 @@ export function SafetyPanel({
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const handleRun = async () => {
     setIsRunning(true);
     setProgress(null);
     setError(null);
+    setJobId(null);
     try {
-      const result = await evaluateSafetyWithProgress(pipelineId, (completed, total) =>
-        setProgress({ completed, total }),
+      const result = await evaluateSafetyWithProgress(
+        pipelineId,
+        (completed, total) => setProgress({ completed, total }),
+        setJobId,
+        runId,
       );
       onResult(result);
     } catch (err) {
-      setError(err instanceof BuildApiError ? err.message : "The safety check failed.");
+      if (!(err instanceof EvaluationCancelledError)) {
+        setError(err instanceof BuildApiError ? err.message : "The safety check failed.");
+      }
     } finally {
       setIsRunning(false);
+      setIsCancelling(false);
+      setJobId(null);
+    }
+  };
+
+  const handleStop = async () => {
+    if (!jobId) return;
+    setIsCancelling(true);
+    try {
+      await cancelSafetyJob(pipelineId, jobId);
+    } catch {
+      // The run's own catch block already surfaces a terminal state once its
+      // poll loop sees the job leave "running" -- a failed cancel request
+      // just means the next poll finds it done/errored instead of cancelled.
     }
   };
 
@@ -76,9 +106,13 @@ export function SafetyPanel({
         </div>
         {readOnly ? (
           <span className={styles.historical}>Historical result</span>
+        ) : isRunning ? (
+          <Button variant="danger-ghost" onClick={() => void handleStop()} disabled={isCancelling || !jobId}>
+            {isCancelling ? "Stopping…" : "Stop"}
+          </Button>
         ) : (
-          <Button variant="primary" onClick={handleRun} disabled={isRunning}>
-            {isRunning ? "Running…" : report ? "Run again" : "Run safety check"}
+          <Button variant="primary" onClick={() => void handleRun()}>
+            {report ? "Run again" : "Run safety check"}
           </Button>
         )}
       </div>

@@ -62,8 +62,8 @@ PASSED_ACTIONS = {"safe", "accept"}
 # Tried in order; the first path that exists on disk wins, so this works the
 # same whether the process runs under WSL or native Windows.
 _BUILTIN_SAFETY_CSV_CANDIDATES = [
-    Path(r"C:\Users\soghm\OneDrive\Desktop\wliura\crestbd-polarus-chatbot\nn_experimentation\mixed.csv"),
-    Path("/mnt/c/Users/soghm/OneDrive/Desktop/wliura/crestbd-polarus-chatbot/nn_experimentation/mixed.csv"),
+    Path(r"C:\Users\soghm\OneDrive\Desktop\wliura\crestbd-polarus-chatbot\research\nn_experimentation\mixed.csv"),
+    Path("/mnt/c/Users/soghm/OneDrive/Desktop/wliura/crestbd-polarus-chatbot/research/nn_experimentation/mixed.csv"),
 ]
 
 
@@ -400,7 +400,11 @@ class Faithfulness_Judge_Agent(Agent):
             "and a generated answer. Your task is to judge whether the answer's "
             "claims are supported by the context."
         )
-        super().__init__(query, context, role)
+        # Not a pipeline node (never goes through Pipeline.run()'s shared-state
+        # patching), so `context` here is just a one-shot constructor value,
+        # not the base class's shared `state` dict -- stored separately.
+        super().__init__(query, None, role)
+        self.context = context
         self.answer = answer
 
     def pre(self) -> dict:
@@ -481,10 +485,11 @@ class AgentEvalReport:
 def _extract_final_resources(pipeline: Pipeline, trace: list) -> list[dict]:
     """The resource set the last retrieval/rerank node in the run produced.
 
-    Every retrieval agent accumulates onto its incoming context (contract.md
-    section 8), and a Reranker_Agent's output is that same accumulated set
-    filtered/reordered -- so whichever such node ran last in the trace holds
-    the complete resource set any downstream generation node actually saw.
+    Every retrieval agent accumulates onto shared state's "context" key
+    (contract.md section 4a/8), and a Reranker_Agent's output is that same
+    accumulated set filtered/reordered -- so whichever such node ran last in
+    the trace holds the complete resource set any downstream generation node
+    actually saw.
     """
     nodes = pipeline.flow()
     last_text: str | None = None

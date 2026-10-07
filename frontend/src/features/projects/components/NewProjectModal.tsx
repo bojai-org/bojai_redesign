@@ -5,6 +5,7 @@ import { FormField } from "../../../components/forms/FormField";
 import { TextInput } from "../../../components/forms/TextInput";
 import { TextArea } from "../../../components/forms/TextArea";
 import { Button } from "../../../components/actions/Button";
+import { BuildApiError } from "../../build/api/pipelineApi";
 import styles from "./NewProjectModal.module.css";
 
 export interface NewProjectInput {
@@ -15,7 +16,9 @@ export interface NewProjectInput {
 export interface NewProjectModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (input: NewProjectInput) => void;
+  /** Resolves once the project is saved; a rejection is shown in the modal
+   * and the form is kept so nothing typed is lost. */
+  onCreate: (input: NewProjectInput) => Promise<void>;
 }
 
 export function NewProjectModal({
@@ -25,20 +28,35 @@ export function NewProjectModal({
 }: NewProjectModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleClose = () => {
+  const reset = () => {
     setName("");
     setDescription("");
+    setError(null);
+  };
+
+  const handleClose = () => {
+    if (saving) return;
+    reset();
     onClose();
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedName = name.trim();
-    if (!trimmedName) return;
-    onCreate({ name: trimmedName, description: description.trim() });
-    setName("");
-    setDescription("");
+    if (!trimmedName || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onCreate({ name: trimmedName, description: description.trim() });
+      reset();
+    } catch (caught) {
+      setError(caught instanceof BuildApiError ? caught.message : "Could not save the project.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -62,12 +80,17 @@ export function NewProjectModal({
             placeholder="What does this assistant help with?"
           />
         </FormField>
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
         <div className={styles.actions}>
-          <Button type="button" onClick={handleClose}>
+          <Button type="button" onClick={handleClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary">
-            Create project
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? "Saving…" : "Create project"}
           </Button>
         </div>
       </form>

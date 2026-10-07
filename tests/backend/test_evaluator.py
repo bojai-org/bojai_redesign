@@ -275,9 +275,9 @@ async def test_evaluate_agent_scores_resources_faithfulness_and_similarity(fake_
     ]
 
     fake_llm.queue(
-        f'```json\n{{"answer": "{ANSWER_1}"}}\n```',
+        f"```markdown\n{ANSWER_1}\n```",
         '```json\n{"faithful": true, "score": 1.0, "reason": "fully grounded"}\n```',
-        f'```json\n{{"answer": "{ANSWER_2}"}}\n```',
+        f"```markdown\n{ANSWER_2}\n```",
         '```json\n{"faithful": false, "score": 0.0, "reason": "not grounded"}\n```',
     )
 
@@ -315,7 +315,7 @@ async def test_evaluate_agent_records_error_without_aborting_batch(fake_llm, rag
     # Only enough responses for the first question's full flow (answer + faithfulness);
     # the second question's answer call then finds an empty queue and raises.
     fake_llm.queue(
-        '```json\n{"answer": "some answer"}\n```',
+        "```markdown\nsome answer\n```",
         '```json\n{"faithful": true, "score": 1.0, "reason": "ok"}\n```',
     )
 
@@ -337,7 +337,7 @@ def test_evaluator_validates_csv_at_construction(rag_pipeline):
 @pytest.mark.asyncio
 async def test_evaluator_omits_safety_report_without_barrier_nodes(fake_llm, rag_pipeline):
     fake_llm.queue(
-        '```json\n{"answer": "grounded reply"}\n```',
+        "```markdown\ngrounded reply\n```",
         '```json\n{"faithful": true, "score": 1.0, "reason": "ok"}\n```',
     )
     qa_csv = "question,expected_answer\nWhat is lithium?,A mood stabilizer.\n"

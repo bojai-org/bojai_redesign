@@ -1,0 +1,36 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.activeUp {
+  background: var(--teal-100);
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.activeUp:hover {
+  color: var(--teal);
+}
+
+.activeDown {
+  background: var(--rose-100);
+  border-color: var(--rose);
+  color: var(--rose);
+}
+
+.activeDown:hover {
+  color: var(--rose);
+}
+
+.explanation {
+  font-size: 12.5px;
+  min-height: 0;
+}

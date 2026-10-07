@@ -3,10 +3,13 @@ registered with the JSON-pipeline compiler and actually run through Pipeline,
 per contract.md.
 """
 
+import pytest
+
 import agents
 import base_classes
 import safety_agents
 from compiler import compile_pipeline
+from pipeline import Pipeline, PipelineRuntimeError
 
 FULL_AGENT_REGISTRY = {
     "Decision_Agent": agents.Decision_Agent,
@@ -110,7 +113,7 @@ async def test_contract_example_chains_retrieval_hops_without_a_reply_agent_betw
 
     fake_llm.queue(
         '```json\n{"decision": "semantic"}\n```',
-        '```json\n{"answer": "grounded reply"}\n```',
+        "```markdown\ngrounded reply\n```",
     )
 
     pipeline = compile_pipeline(definition, agent_registry=registry)
@@ -214,10 +217,12 @@ async def test_static_barrier_agent_routes_by_its_action_key():
 async def test_binary_judge_agent_no_route_preserves_resources_for_a_retry_hop(
     fake_llm, corpus_address
 ):
-    """Binary_Judge_Agent sits between two retrieval hops. Its "no" route must hand
-    the resources it just judged back to rag_2 unharmed (not the literal string
-    "no"), so rag_2 can dedup against them and add a genuinely new chunk -- the
-    retry-loop pattern this whole context/"route" split exists to support.
+    """Binary_Judge_Agent sits between two retrieval hops. Its "no" route must
+    leave shared state's "context" key (rag_1's resources) intact for rag_2 to
+    dedup against and add a genuinely new chunk -- the retry-loop pattern this
+    whole shared-state design exists to support. Binary_Judge_Agent writes
+    nothing to shared state itself (WRITES is empty), so it has no way to
+    disturb it either way it routes.
     """
     registry = {
         "RAG_Agent": agents.RAG_Agent,
@@ -259,7 +264,7 @@ async def test_binary_judge_agent_no_route_preserves_resources_for_a_retry_hop(
 
     fake_llm.queue(
         '```json\n{"sufficient": false, "reason": "only one source so far"}\n```',
-        '```json\n{"answer": "grounded reply"}\n```',
+        "```markdown\ngrounded reply\n```",
     )
 
     pipeline = compile_pipeline(definition, agent_registry=registry)
@@ -269,11 +274,10 @@ async def test_binary_judge_agent_no_route_preserves_resources_for_a_retry_hop(
     assert len(fake_llm.calls) == 2  # only the judge and the final answer call the LLM
 
     rag_1_ids = agents._extract_seen_ids(result.node_outputs["rag_1"])
-    judge_ids = agents._extract_seen_ids(result.node_outputs["judge"]["context"])
     rag_2_ids = agents._extract_seen_ids(result.node_outputs["rag_2"])
 
+    assert result.node_outputs["judge"] == {"route": "no", "reason": "only one source so far"}
     assert len(rag_1_ids) == 1
-    assert judge_ids == rag_1_ids  # the judge's own context key is untouched
     assert rag_1_ids < rag_2_ids  # rag_2 kept it and added a genuinely new chunk
     assert len(rag_2_ids) == 2
 
@@ -314,3 +318,138 @@ async def test_neural_network_barrier_agent_runs_via_python_mapping_source():
     result = await pipeline.run()
 
     assert result.output == "blocked"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared pipeline state: namespaced WRITES enforcement (Pipeline._collect_state_writes)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_collect_state_writes_extracts_only_the_declared_key():
+    class OnlyAnswer:
+        WRITES = frozenset({"answer"})
+
+    assert Pipeline._collect_state_writes(OnlyAnswer(), "final reply") == {"answer": "final reply"}
+
+
+def test_collect_state_writes_skips_none_values_without_clobbering():
+    class Barrier:
+        WRITES = frozenset({"answer"})
+
+    assert Pipeline._collect_state_writes(Barrier(), {"action": "safe", "answer": None}) == {}
+
+
+def test_collect_state_writes_ignores_routing_only_keys():
+    """route/action/reason/layer/score are not part of the namespaced state
+    registry -- a dict result carrying only those never triggers a write or
+    a violation, regardless of what the agent declares."""
+    class Router:
+        WRITES = frozenset()
+
+    result = {"route": "yes", "reason": "looks fine", "action": "safe", "layer": 1, "score": 0.1}
+    assert Pipeline._collect_state_writes(Router(), result) == {}
+
+
+def test_collect_state_writes_raises_when_an_undeclared_namespaced_key_is_present():
+    """Catches the authoring mistake this whole mechanism exists to prevent:
+    a node whose result dict smuggles in a namespaced key it never declared
+    owning -- even one that writes nothing else (WRITES is empty), which is
+    exactly the shape a router/judge agent's result normally has.
+    """
+    class SilentRouter:
+        WRITES = frozenset()
+
+    with pytest.raises(PipelineRuntimeError, match="not declared to write"):
+        Pipeline._collect_state_writes(SilentRouter(), {"route": "yes", "context": "smuggled in"})
+
+
+def test_collect_state_writes_raises_on_ambiguous_scalar_result():
+    class TwoKeys:
+        WRITES = frozenset({"answer", "context"})
+
+    with pytest.raises(PipelineRuntimeError, match="unambiguous"):
+        Pipeline._collect_state_writes(TwoKeys(), "a bare string result")
+
+
+def test_collect_state_writes_agent_with_no_writes_and_scalar_result_is_a_noop():
+    class Stateless:
+        WRITES = frozenset()
+
+    assert Pipeline._collect_state_writes(Stateless(), "some text nobody should keep") == {}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared pipeline state end-to-end: a Decision_Agent's routing choice never
+# leaks into a downstream generation node's "context" -- the exact confusion
+# ("pipelines are confusing answers from context") the shared, namespaced
+# state dict replaces node-to-node string forwarding to fix.
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def test_decision_agents_choice_never_leaks_into_the_next_nodes_context(fake_llm):
+    registry = {
+        "Decision_Agent": agents.Decision_Agent,
+        "Direct_Answer_Agent": agents.Direct_Answer_Agent,
+        "_Static_Agent_Auto": agents._Static_Agent_Auto,
+    }
+    definition = {
+        "config": {"provider": "test", "model": "test-model"},
+        "entrypoint": "decision",
+        "nodes": {
+            "decision": {
+                "type": "Decision_Agent",
+                "prev": -1,
+                "options": ["go"],
+                "go": "answer",
+            },
+            "answer": {
+                "type": "Direct_Answer_Agent",
+                "prev": "decision",
+                "next": -1,
+            },
+        },
+    }
+
+    fake_llm.queue(
+        '```json\n{"decision": "go"}\n```',
+        "```markdown\nfinal answer text\n```",
+    )
+
+    pipeline = compile_pipeline(definition, agent_registry=registry)
+    result = await pipeline.run(initial_query="what should I do")
+
+    assert result.output == "final answer text"
+    # Direct_Answer_Agent's own prompt fields must never have carried the
+    # Decision_Agent's raw "go" choice as if it were retrieved context.
+    answer_prompt_config = fake_llm.calls[1]["prompt"]
+    assert answer_prompt_config.find("context").render() == ""
+
+
+async def test_pipeline_output_prefers_state_answer_over_a_bare_retrieval_result(
+    corpus_address,
+):
+    """A pipeline that ends on a retrieval node with no answer-writing node
+    downstream must not surface the raw retrieved-resources dump as the
+    user-facing output -- with nothing in state["answer"], the old raw
+    last-node value is still the fallback, but an answer node anywhere in
+    the run always wins."""
+    registry = {"RAG_Agent": agents.RAG_Agent, "_Static_Agent_Auto": agents._Static_Agent_Auto}
+    definition = {
+        "config": {"provider": "test", "model": "test-model"},
+        "entrypoint": "rag",
+        "nodes": {
+            "rag": {
+                "type": "RAG_Agent",
+                "prev": -1,
+                "query": "lithium mania quetiapine",
+                "corpus_address": corpus_address,
+                "top_k": 1,
+                "next": -1,
+            }
+        },
+    }
+
+    pipeline = compile_pipeline(definition, agent_registry=registry)
+    result = await pipeline.run()
+
+    # No answer-writing node ran, so the fallback is the raw retrieval result --
+    # exactly what RAG_Agent itself returned, not some other node's leftovers.
+    assert "[Resource 1]" in result.output

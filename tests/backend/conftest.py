@@ -42,6 +42,15 @@ class FakeLLM:
         return self.responses.popleft()
 
 
+@pytest.fixture(autouse=True)
+def bojai_home(tmp_path, monkeypatch) -> Path:
+    """Points database.py at a throwaway folder, so no test ever reads or
+    writes the real ~/.bojai/bojai.db."""
+    home = tmp_path / "bojai-home"
+    monkeypatch.setenv("BOJAI_HOME", str(home))
+    return home
+
+
 @pytest.fixture
 def fake_llm(monkeypatch):
     """Patch base_classes.ask_llm (the name Agent.run() actually calls)."""

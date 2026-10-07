@@ -1,8 +1,10 @@
+import { PageContainer } from "../../../components/layout/PageContainer";
+import { GlobalVariablesSection } from "../components/GlobalVariablesSection";
+
 export function ProjectSettingsPage() {
   return (
-    <div className="page-placeholder">
-      <h1>Project settings</h1>
-      <p>Project settings placeholder.</p>
-    </div>
+    <PageContainer width="default">
+      <GlobalVariablesSection />
+    </PageContainer>
   );
 }
